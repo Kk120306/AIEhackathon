@@ -18,6 +18,12 @@ export type TutorResponse = {
   follow_up_questions?: string[];
 };
 
+export type GeneratedIllustration = {
+  imageBase64: string;
+  mimeType: string;
+  prompt: string;
+};
+
 export type AppStatus =
   | "idle"
   | "listening"

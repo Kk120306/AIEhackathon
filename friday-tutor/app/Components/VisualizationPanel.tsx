@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import type { TutorResponse } from "../types";
+import type { GeneratedIllustration, TutorResponse } from "../types";
+import GeneratedImagePanel from "./GeneratedImagePanel";
 
 // ── Desmos graph ──────────────────────────────────────────────────────────────
 
@@ -99,12 +100,55 @@ function StepsPanel({ steps, topic }: { steps: string[]; topic?: string }) {
   );
 }
 
+// ── Generate illustration (above Friday's answer / visualisation) ─────────────
+
+function IllustrationActionBar({
+  onGenerate,
+  isGenerating,
+}: {
+  onGenerate: () => void;
+  isGenerating: boolean;
+}) {
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={onGenerate}
+        disabled={isGenerating}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/40 transition-[filter,opacity] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        title="Generate an educational diagram with Imagen"
+      >
+        {isGenerating ? (
+          <>
+            <span
+              aria-hidden
+              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+            />
+            Generating illustration…
+          </>
+        ) : (
+          <>
+            <span aria-hidden>✨</span>
+            Generate illustration
+          </>
+        )}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-zinc-500">
+        Optional — illustration opens at the top; Friday&apos;s written answer stays below it
+      </p>
+    </div>
+  );
+}
+
 // ── Answer panel (shown in right panel when no tool is active) ────────────────
 
 function AnswerDisplay({ response }: { response: TutorResponse }) {
   const content = response.display_answer ?? response.spoken_answer;
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+        Friday&apos;s answer
+      </p>
       {response.topic && (
         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-400">
           {response.topic}
@@ -134,9 +178,38 @@ function AnswerDisplay({ response }: { response: TutorResponse }) {
 
 export default function VisualizationPanel({
   response,
+  generatedImage,
+  onCloseImage,
+  onRegenerateImage,
+  isRegeneratingImage,
+  onGenerateImage,
+  isGeneratingImage,
 }: {
   response: TutorResponse | null;
+  generatedImage?: GeneratedIllustration | null;
+  onCloseImage?: () => void;
+  onRegenerateImage?: () => void;
+  isRegeneratingImage?: boolean;
+  onGenerateImage?: () => void;
+  isGeneratingImage?: boolean;
 }) {
+  // Generated illustration at the top — written answer stays below for reference
+  if (generatedImage) {
+    return (
+      <div className="space-y-4">
+        <GeneratedImagePanel
+          imageBase64={generatedImage.imageBase64}
+          mimeType={generatedImage.mimeType}
+          prompt={generatedImage.prompt}
+          onClose={onCloseImage ?? (() => {})}
+          onRegenerate={onRegenerateImage}
+          isRegenerating={isRegeneratingImage}
+        />
+        {response ? <AnswerDisplay response={response} /> : null}
+      </div>
+    );
+  }
+
   // No response yet — show placeholder
   if (!response) {
     return (
@@ -148,6 +221,26 @@ export default function VisualizationPanel({
     );
   }
 
+  const showIllustrationBar =
+    !response.out_of_scope && !!onGenerateImage;
+
+  const wrapWithIllustrationBar = (viz: ReactNode) =>
+    showIllustrationBar ? (
+      <div className="space-y-4">
+        <IllustrationActionBar
+          onGenerate={onGenerateImage!}
+          isGenerating={isGeneratingImage ?? false}
+        />
+        <AnswerDisplay response={response} />
+        {viz}
+      </div>
+    ) : (
+      <div className="space-y-4">
+        <AnswerDisplay response={response} />
+        {viz}
+      </div>
+    );
+
   // Tool call present — render the appropriate visualisation
   if (response.tool_call) {
     const { name, args } = response.tool_call;
@@ -156,11 +249,11 @@ export default function VisualizationPanel({
       const expressions = Array.isArray(args.expressions)
         ? (args.expressions as string[])
         : [];
-      return <DesmosPanel expressions={expressions} />;
+      return wrapWithIllustrationBar(<DesmosPanel expressions={expressions} />);
     }
 
     if (name === "show_molecule_3d") {
-      return (
+      return wrapWithIllustrationBar(
         <MoleculePanel
           moleculeName={String(args.molecule_name ?? "")}
           pubchemCid={args.pubchem_cid ? String(args.pubchem_cid) : undefined}
@@ -170,10 +263,22 @@ export default function VisualizationPanel({
 
     if (name === "show_steps_breakdown") {
       const steps = Array.isArray(args.steps) ? (args.steps as string[]) : [];
-      return <StepsPanel steps={steps} topic={args.topic ? String(args.topic) : undefined} />;
+      return wrapWithIllustrationBar(
+        <StepsPanel steps={steps} topic={args.topic ? String(args.topic) : undefined} />
+      );
     }
   }
 
-  // No tool call — show the answer with LaTeX in the right panel
-  return <AnswerDisplay response={response} />;
+  // No tool call — answer only (bar sits above the same AnswerDisplay)
+  return showIllustrationBar ? (
+    <div className="space-y-4">
+      <IllustrationActionBar
+        onGenerate={onGenerateImage!}
+        isGenerating={isGeneratingImage ?? false}
+      />
+      <AnswerDisplay response={response} />
+    </div>
+  ) : (
+    <AnswerDisplay response={response} />
+  );
 }

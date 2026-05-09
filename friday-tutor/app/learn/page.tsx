@@ -11,7 +11,12 @@ import CameraPanel, {
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics } from "../hooks/useAnalytics";
-import type { AppStatus, ConversationMessage, TutorResponse } from "../types";
+import type {
+  AppStatus,
+  ConversationMessage,
+  GeneratedIllustration,
+  TutorResponse,
+} from "../types";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -19,9 +24,151 @@ import Image from "next/image";
 
 const LISTEN_RESUME_DELAY_MS = 500;
 const SILENCE_RETRY_LIMIT = 2;
+const FEEDBACK_CLEAR_MS = 2500;
 
 const DEFAULT_PHOTO_QUESTION =
   "Please read the question shown in this photo and walk me through the full solution step by step.";
+
+function ThinkingOverlay({ question }: { question: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-[#09090b]/78 px-6 backdrop-blur-md"
+    >
+      <div className="friday-thinking-shell relative w-full max-w-sm overflow-hidden rounded-2xl border border-indigo-500/30 bg-zinc-950/90 p-6 text-center shadow-2xl shadow-indigo-950/50">
+        <div aria-hidden className="friday-thinking-aurora" />
+
+        <div className="relative mx-auto flex h-24 w-24 items-center justify-center">
+          <div className="friday-orbit friday-orbit-one" />
+          <div className="friday-orbit friday-orbit-two" />
+          <Image
+            src="/friday-logo.png"
+            alt=""
+            width={48}
+            height={48}
+            className="friday-logo-pulse rounded-2xl shadow-lg shadow-indigo-900/40"
+            priority
+          />
+        </div>
+
+        <h2 className="relative mt-5 text-lg font-bold tracking-tight text-white">
+          Friday is thinking
+        </h2>
+        <p className="relative mt-2 line-clamp-2 text-sm leading-relaxed text-zinc-400">
+          {question || "Building a clear answer..."}
+        </p>
+
+        <div className="relative mt-6 flex justify-center gap-2" aria-hidden>
+          <span className="friday-thinking-dot" />
+          <span className="friday-thinking-dot friday-thinking-dot-delay-one" />
+          <span className="friday-thinking-dot friday-thinking-dot-delay-two" />
+        </div>
+
+        <div className="relative mt-5 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+          <div className="friday-thinking-bar h-full rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Voice commands ─────────────────────────────────────────────────────────────
+
+// Listed longest-first so e.g. "retake the photo" is consumed before plain
+// "retake". All matched with word boundaries, case-insensitively.
+const CAPTURE_PHRASES = [
+  "take a photo of this", "take a photo of that",
+  "take a picture of this", "take a picture of that",
+  "take another photo", "take another picture",
+  "snap a photo of this", "snap a picture of this",
+  "snap a photo", "snap a picture",
+  "take a photo", "take a picture", "take a pic",
+  "take the photo", "take the picture",
+  "snap this", "snap that", "snap it",
+  "capture this", "capture that", "capture it",
+];
+
+const RETAKE_PHRASES = [
+  "retake the photo", "retake the picture", "retake that",
+  "redo the photo", "redo the picture",
+  "try the photo again", "try that again",
+  "another shot",
+  "retake", "redo",
+];
+
+const SEND_PHRASES = [
+  "send the photo to friday", "send it to friday", "send to friday",
+  "send the photo", "send this photo", "send the picture", "send this picture",
+  "use this photo", "use the photo", "use this picture",
+  "send it",
+];
+
+const CANCEL_PHRASES = [
+  "cancel the photo", "cancel the picture", "cancel that photo",
+  "discard the photo", "discard the picture",
+  "nevermind the photo", "never mind the photo",
+  "without the photo", "no photo",
+];
+
+type ParsedCommand = {
+  capture: boolean;
+  retake: boolean;
+  send: boolean;
+  cancel: boolean;
+  residual: string;
+};
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripPhrases(text: string, phrases: string[]): { matched: boolean; text: string } {
+  let matched = false;
+  let out = text;
+  for (const phrase of phrases) {
+    const re = new RegExp(`\\b${escapeRegex(phrase)}\\b`, "gi");
+    if (re.test(out)) {
+      matched = true;
+      out = out.replace(re, " ");
+    }
+  }
+  return { matched, text: out };
+}
+
+function parseVoiceCommand(transcript: string): ParsedCommand {
+  let text = transcript;
+
+  const cancel = stripPhrases(text, CANCEL_PHRASES);
+  text = cancel.text;
+  const retake = stripPhrases(text, RETAKE_PHRASES);
+  text = retake.text;
+  const capture = stripPhrases(text, CAPTURE_PHRASES);
+  text = capture.text;
+  const send = stripPhrases(text, SEND_PHRASES);
+  text = send.text;
+
+  // Tidy the residual: collapse whitespace, drop leading filler / conjunctions
+  // (and / then / please / now / so / ok / okay / um / uh) plus dangling
+  // punctuation. Looped because "um, and explain" needs two passes.
+  // \b lets us also consume a filler that's the entire residual (e.g. just "and").
+  let residual = text.replace(/\s+/g, " ").trim();
+  const fillerRe = /^(?:and|then|please|now|so|ok|okay|um|uh|hey|friday)\b[\s,]*/i;
+  let prev: string;
+  do {
+    prev = residual;
+    residual = residual.replace(fillerRe, "").replace(/^[\s,.!?-]+/, "").trim();
+  } while (residual !== prev);
+  if (/^[\s.,!?]*$/.test(residual)) residual = "";
+
+  return {
+    capture: capture.matched,
+    retake: retake.matched,
+    send: send.matched,
+    cancel: cancel.matched,
+    residual,
+  };
+}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +181,9 @@ export default function LearnPage() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [isConversationActive, setIsConversationActive] = useState(false);
+  const [voiceFeedback, setVoiceFeedback] = useState<{ text: string; tone: "info" | "warn" } | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<GeneratedIllustration | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const { voiceId } = useVoicePreference();
   const { startSession, recordExchange, endSession } = useAnalytics();
@@ -45,6 +195,7 @@ export default function LearnPage() {
   const silenceRetriesRef = useRef(0);
   const startListeningRef = useRef<() => void>(() => {});
   const voiceIdRef = useRef(voiceId);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { voiceIdRef.current = voiceId; }, [voiceId]);
 
@@ -71,6 +222,23 @@ export default function LearnPage() {
       stopCurrentSpeech();
     };
   }, [stopCurrentSpeech]);
+
+  // Clear any pending feedback timer on unmount so we don't setState on a
+  // stale component.
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    };
+  }, []);
+
+  const flash = useCallback((text: string, tone: "info" | "warn" = "info") => {
+    setVoiceFeedback({ text, tone });
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = setTimeout(() => {
+      setVoiceFeedback(null);
+      feedbackTimerRef.current = null;
+    }, FEEDBACK_CLEAR_MS);
+  }, []);
 
   // Make sure analytics always get a session end-time, even if the user closes
   // the tab, refreshes, or hard-navigates away mid-conversation. Without this
@@ -171,8 +339,11 @@ export default function LearnPage() {
       const message = q.trim();
       if (!message) return;
       stopCurrentSpeech();
+      setQuestion(message);
       setStatus("thinking");
       setResponse(null);
+      setGeneratedImage(null);
+      setIsGeneratingImage(false);
       setError("");
 
       const imageBase64 = image?.base64;
@@ -244,6 +415,43 @@ export default function LearnPage() {
     [askBackend]
   );
 
+  const handleGenerateImage = useCallback(async () => {
+    if (!response || response.out_of_scope) return;
+    const q = question.trim();
+    if (!q) return;
+
+    setIsGeneratingImage(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: q,
+          answer: response.display_answer ?? response.spoken_answer,
+          topic: response.topic,
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Couldn't generate an illustration.");
+      }
+      setGeneratedImage({
+        imageBase64: payload.imageBase64,
+        mimeType: payload.mimeType,
+        prompt: payload.promptUsed,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Couldn't generate an illustration.";
+      setError(msg);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [question, response]);
+
+  const handleCloseImage = useCallback(() => setGeneratedImage(null), []);
+
   const handleSendCapture = useCallback(
     (image: CapturedImage) => {
       const message = question.trim() || DEFAULT_PHOTO_QUESTION;
@@ -273,9 +481,83 @@ export default function LearnPage() {
     (transcript: string) => {
       setQuestion(transcript);
       silenceRetriesRef.current = 0;
-      handleQuestion(transcript);
+
+      const cmd = parseVoiceCommand(transcript);
+      const camera = cameraRef.current;
+
+      // No commands matched → behave exactly like before.
+      if (!cmd.capture && !cmd.retake && !cmd.send && !cmd.cancel) {
+        handleQuestion(transcript);
+        return;
+      }
+
+      // Cancel: drop any armed photo. Doesn't affect the residual flow below.
+      if (cmd.cancel) {
+        camera?.discardArmed();
+        flash("Photo discarded");
+      }
+
+      // Retake: discard the old, then capture a fresh frame. If the camera
+      // isn't open, we can't actually retake — warn and keep going.
+      if (cmd.retake) {
+        camera?.discardArmed();
+        if (camera?.isReady()) {
+          const img = camera.captureNow();
+          if (img) flash("Photo retaken");
+          else flash("Couldn't grab a frame — try again", "warn");
+        } else {
+          flash("Open the camera first to take a photo", "warn");
+        }
+      }
+
+      // Capture (possibly combined with extra question text)
+      if (cmd.capture) {
+        if (!camera?.isReady()) {
+          flash("Open the camera first to take a photo", "warn");
+          // Fall through: if there's residual text, still answer it as text.
+        } else {
+          const img = camera.captureNow();
+          if (img && cmd.residual) {
+            // "take a photo and explain this" → ship it now in one go.
+            askBackend(cmd.residual, img);
+            return;
+          }
+          if (img) {
+            // Skip the flash if a Send command is about to fire on the same
+            // utterance — the "thinking" state will replace it anyway.
+            if (!cmd.send) flash("Photo captured — now ask your question");
+          } else {
+            flash("Couldn't grab a frame — try again", "warn");
+          }
+        }
+      }
+
+      // Send: ship whatever's armed (or just send a text-only question).
+      if (cmd.send) {
+        const armed = camera?.takeArmedImage() ?? null;
+        const message = cmd.residual || (armed ? DEFAULT_PHOTO_QUESTION : "");
+        if (!message) {
+          // "send it" with nothing armed and no extra text → nothing to send;
+          // resume listening so the conversation doesn't stall.
+          flash("Nothing to send yet", "warn");
+          if (isConversationActiveRef.current) resumeListening();
+          return;
+        }
+        askBackend(message, armed ?? undefined);
+        return;
+      }
+
+      // Pure command (e.g. "take a photo" alone with nothing armed) — keep
+      // listening for the actual question. If there's residual text from a
+      // capture/retake/cancel command, treat it as a normal question
+      // (handleQuestion will auto-attach the freshly armed photo).
+      if (cmd.residual) {
+        handleQuestion(cmd.residual);
+      } else if (isConversationActiveRef.current) {
+        resumeListening();
+      }
     },
-    [handleQuestion]
+    [handleQuestion, askBackend, flash, resumeListening]
   );
 
   const { isRecording, startListening, stopListening, submitNow } = useVoiceRecorder({
@@ -347,9 +629,12 @@ export default function LearnPage() {
     "Explain Le Chatelier's principle for A-Level chemistry.",
     "Explain Newton's second law and how to use F equals ma in exam questions.",
   ];
+  const isWaitingForAnswer = status === "thinking" || status === "transcribing";
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white">
+      {isWaitingForAnswer && <ThinkingOverlay question={question} />}
+
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
@@ -386,6 +671,21 @@ export default function LearnPage() {
           {/* LEFT PANEL */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
             <CameraPanel ref={cameraRef} onSendCapture={handleSendCapture} />
+
+            {voiceFeedback && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
+                  voiceFeedback.tone === "warn"
+                    ? "border-amber-800/60 bg-amber-950/40 text-amber-200"
+                    : "border-indigo-800/60 bg-indigo-950/40 text-indigo-200"
+                }`}
+              >
+                <span aria-hidden>{voiceFeedback.tone === "warn" ? "⚠️" : "🎙️"}</span>
+                {voiceFeedback.text}
+              </div>
+            )}
 
             <MicButton
               isConversationActive={isConversationActive}
@@ -496,9 +796,19 @@ export default function LearnPage() {
               <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400">
                 Visual Explanation
               </p>
-              <h2 className="mt-1 text-lg font-bold">Desmos · MolView · Steps</h2>
+              <h2 className="mt-1 text-lg font-bold">
+                Desmos · MolView · Steps · Illustrations
+              </h2>
             </div>
-            <VisualizationPanel response={response} />
+            <VisualizationPanel
+              response={response}
+              generatedImage={generatedImage}
+              onCloseImage={handleCloseImage}
+              onRegenerateImage={handleGenerateImage}
+              isRegeneratingImage={isGeneratingImage}
+              onGenerateImage={handleGenerateImage}
+              isGeneratingImage={isGeneratingImage}
+            />
           </div>
         </div>
       </main>

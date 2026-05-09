@@ -31,6 +31,12 @@ export interface CameraPanelHandle {
   takeArmedImage(): CapturedImage | null;
   /** True if the student has captured a photo / attached a file waiting to be sent. */
   hasArmedImage(): boolean;
+  /** True when the live camera is open and ready to snap a frame. */
+  isReady(): boolean;
+  /** Imperatively snap a frame (same as the "Take photo" button). Returns null if camera isn't ready. */
+  captureNow(): CapturedImage | null;
+  /** Discard any armed photo / snapshot (same as "Retake"). */
+  discardArmed(): void;
 }
 
 interface CameraPanelProps {
@@ -214,8 +220,23 @@ const CameraPanel = forwardRef<CameraPanelHandle, CameraPanelProps>(
           return img;
         },
         hasArmedImage: () => armedRef.current !== null,
+        isReady: () => state === "active",
+        captureNow: () => {
+          const img = takeSnapshot();
+          if (img) {
+            armedRef.current = img;
+            setSnapshot(img);
+            setUploadError("");
+          }
+          return img;
+        },
+        discardArmed: () => {
+          armedRef.current = null;
+          setSnapshot(null);
+          setUploadError("");
+        },
       }),
-      []
+      [state, takeSnapshot]
     );
 
     // ── Collapsed view ──────────────────────────────────────────────────────
