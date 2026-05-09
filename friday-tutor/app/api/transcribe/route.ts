@@ -51,6 +51,14 @@ function badRequest(error: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const contentType = req.headers.get("content-type") ?? "";
+    if (
+      !contentType.includes("multipart/form-data") &&
+      !contentType.includes("application/x-www-form-urlencoded")
+    ) {
+      return badRequest("audio file is required");
+    }
+
     const formData = await req.formData();
     const audio = formData.get("audio");
     const languageValue = formData.get("language");
@@ -92,7 +100,7 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_TRANSCRIPTION_MODEL ?? "gemini-2.0-flash",
+      model: process.env.GEMINI_TRANSCRIPTION_MODEL ?? "gemini-2.5-flash",
     });
 
     const languageInstruction = language
