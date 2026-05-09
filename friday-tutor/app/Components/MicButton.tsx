@@ -1,24 +1,47 @@
 "use client";
 
+type MicButtonProps = {
+  setQuestion: (value: string) => void;
+  askFriday: (question: string) => void;
+  setStatus: (status: "idle" | "listening" | "thinking" | "speaking" | "error") => void;
+};
+
 export default function MicButton({
   setQuestion,
-  askBackend,
+  askFriday,
   setStatus,
-}: any) {
+}: MicButtonProps) {
   const startListening = () => {
     const SpeechRecognition =
-      (window as any).webkitSpeechRecognition ||
-      (window as any).SpeechRecognition;
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Use Chrome.");
+      return;
+    }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
+    recognition.lang = "en-SG";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => setStatus("listening");
+    recognition.onstart = () => {
+      setStatus("listening");
+    };
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setQuestion(transcript);
-      askBackend(transcript);
+      askFriday(transcript);
+    };
+
+    recognition.onerror = () => {
+      setStatus("error");
+    };
+
+    recognition.onend = () => {
+      setStatus("idle");
     };
 
     recognition.start();
@@ -27,7 +50,7 @@ export default function MicButton({
   return (
     <button
       onClick={startListening}
-      className="bg-green-500 hover:bg-green-600 px-6 py-3 rounded-xl text-black font-bold"
+      className="rounded-xl bg-green-500 px-6 py-3 font-bold text-black hover:bg-green-400"
     >
       🎤 Ask Friday
     </button>

@@ -4,14 +4,37 @@ import { useState } from "react";
 import MicButton from "./components/MicButton";
 import AnswerPanel from "./components/AnswerPanel";
 import VisualizationPanel from "./components/VisualizationPanel";
+import { getMockFridayResponse } from "./utils/mockFridayResponse";
+
+export type FridayResponse = {
+  subject: string;
+  topic: string;
+  spoken_answer: string;
+  needs_visualization: boolean;
+  visualization_tool:
+    | "none"
+    | "desmos"
+    | "phet"
+    | "molview"
+    | "force_diagram"
+    | "chem_mechanism";
+  visualization_url?: string;
+  display_steps: string[];
+  diagram_data?: any;
+  exam_tip?: string;
+};
 
 export default function Home() {
   const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState<any>(null);
-  const [status, setStatus] = useState("idle");
+  const [response, setResponse] = useState<FridayResponse | null>(null);
+  const [status, setStatus] = useState<
+    "idle" | "listening" | "thinking" | "speaking" | "error"
+  >("idle");
+
+  const USE_MOCK_BACKEND = true;
 
   const speak = (text: string) => {
-    if (!text) return;
+    if (!text || typeof window === "undefined") return;
 
     window.speechSynthesis.cancel();
 
@@ -20,80 +43,92 @@ export default function Home() {
     utterance.pitch = 1.05;
     utterance.volume = 1;
 
-    utterance.onend = () => {
-      setStatus("idle");
-    };
+    utterance.onend = () => setStatus("idle");
 
     window.speechSynthesis.speak(utterance);
   };
 
-  const askBackend = async (q: string) => {
-    if (!q.trim()) return;
+  const askFriday = async (inputQuestion: string) => {
+    const cleanQuestion = inputQuestion.trim();
+    if (!cleanQuestion) return;
 
+    setQuestion(cleanQuestion);
     setStatus("thinking");
     setResponse(null);
 
-    // TEMPORARY MOCK RESPONSE
-    // Use this until Kai's backend is ready.
-    const mockResponse = {
-      subject: "Mathematics",
-      topic: "Graph Transformation",
-      spoken_answer:
-        "Of course. Start with y equals x squared. The expression x minus 3 shifts the graph 3 units to the right. The coefficient 2 stretches the graph vertically, making it narrower. Finally, the plus 1 shifts the graph 1 unit upward.",
-      needs_visualization: true,
-      visualization_tool: "desmos",
-      visualization_url: "https://www.desmos.com/calculator",
-      display_steps: [
-        "Start with the base graph: y = x².",
-        "Replace x with (x - 3), which shifts the graph 3 units to the right.",
-        "Multiply the function by 2, which stretches the graph vertically.",
-        "Add 1 outside the bracket, which shifts the graph 1 unit upward.",
-      ],
-      exam_tip:
-        "For graph transformations, identify horizontal shifts inside the bracket first, then vertical stretches and vertical translations.",
-    };
+    try {
+      let data: FridayResponse;
 
-    setTimeout(() => {
-      setResponse(mockResponse);
+      if (USE_MOCK_BACKEND) {
+        data = await getMockFridayResponse(cleanQuestion);
+      } else {
+        const res = await fetch("http://localhost:8000/ask", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ question: cleanQuestion }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Backend request failed");
+        }
+
+        data = await res.json();
+      }
+
+      setResponse(data);
       setStatus("speaking");
-      speak(mockResponse.spoken_answer);
-    }, 1000);
-  };
-
-  const handleTypedSubmit = () => {
-    askBackend(question);
+      speak(data.spoken_answer);
+    } catch (error) {
+      console.error(error);
+      setStatus("error");
+      setResponse({
+        subject: "Unknown",
+        topic: "Fallback",
+        spoken_answer:
+          "Sorry, I could not process that question. Please try again or use one of the demo prompts.",
+        needs_visualization: false,
+        visualization_tool: "none",
+        display_steps: [],
+        exam_tip: "In the demo, use the typed fallback if voice input fails.",
+      });
+    }
   };
 
   const demoQuestions = [
     "Show me how y equals x squared changes into y equals 2 times x minus 3 squared plus 1.",
-    "Explain Le Chatelier's principle for A-Level chemistry.",
+    "A car is moving forward and experiences drag. Show me the forces acting on it.",
+    "Explain nucleophilic substitution using bromoethane and hydroxide.",
+    "Show me the molecular geometry of methane.",
     "Explain Newton's second law and how to use F equals ma in exam questions.",
   ];
 
   return (
-    <main className="min-h-screen bg-black text-white p-6">
+    <main className="min-h-screen bg-black p-6 text-white">
       <section className="mb-8">
-        <p className="text-sm uppercase tracking-[0.3em] text-green-400">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-green-400">
           Friday Tutor
         </p>
 
         <h1 className="mt-2 text-4xl font-bold">
-          Voice-first AI Tutor for IB & Singapore A-Levels
+          Voice-first AI Tutor for Singapore A-Level H2 Math, Physics &
+          Chemistry
         </h1>
 
-        <p className="mt-3 max-w-3xl text-gray-400">
-          Ask Friday a Math, Physics, or Chemistry question. Friday will answer
-          verbally and open visual tools when the concept needs to be shown.
+        <p className="mt-3 max-w-4xl text-gray-400">
+          Ask Friday an academic question. Friday answers verbally, then chooses
+          the best visualization: Desmos for Math, force diagrams or PhET for
+          Physics, and MolView or mechanism cards for Chemistry.
         </p>
       </section>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* LEFT PANEL */}
         <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
           <div className="flex items-center gap-4">
             <MicButton
               setQuestion={setQuestion}
-              askBackend={askBackend}
+              askFriday={askFriday}
               setStatus={setStatus}
             />
 
@@ -117,12 +152,12 @@ export default function Home() {
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Example: Show me how y = x² transforms into y = 2(x - 3)² + 1"
+              placeholder="Example: A car is moving forward and experiences drag. Show me the forces acting on it."
               className="mt-2 h-28 w-full resize-none rounded-xl border border-gray-700 bg-black p-4 text-white outline-none focus:border-green-400"
             />
 
             <button
-              onClick={handleTypedSubmit}
+              onClick={() => askFriday(question)}
               className="mt-3 rounded-xl bg-green-500 px-5 py-3 font-bold text-black hover:bg-green-400"
             >
               Ask Friday
@@ -138,10 +173,7 @@ export default function Home() {
               {demoQuestions.map((demo, index) => (
                 <button
                   key={index}
-                  onClick={() => {
-                    setQuestion(demo);
-                    askBackend(demo);
-                  }}
+                  onClick={() => askFriday(demo)}
                   className="rounded-xl border border-gray-700 bg-gray-900 p-3 text-left text-sm text-gray-300 hover:border-green-400 hover:text-white"
                 >
                   {demo}
@@ -153,15 +185,14 @@ export default function Home() {
           <AnswerPanel question={question} response={response} />
         </div>
 
-        {/* RIGHT PANEL */}
         <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
           <div className="mb-4">
-            <p className="text-sm uppercase tracking-[0.2em] text-blue-400">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-400">
               Visual Explanation
             </p>
 
             <h2 className="mt-1 text-2xl font-bold">
-              Desmos / MolView / PhET Panel
+              Desmos / MolView / PhET / Custom Diagrams
             </h2>
           </div>
 

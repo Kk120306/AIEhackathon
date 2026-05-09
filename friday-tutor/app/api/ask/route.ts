@@ -1,78 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
-import { askTutor, type ConversationMessage } from "@/lib/askTutor";
-
-type AskRequestBody = {
-  message?: unknown;
-  conversationHistory?: unknown;
-};
-
-function isConversationMessage(value: unknown): value is ConversationMessage {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  return (
-    (candidate.role === "user" ||
-      candidate.role === "assistant" ||
-      candidate.role === "system") &&
-    typeof candidate.content === "string"
-  );
-}
-
-function parseConversationHistory(value: unknown) {
-  if (value === undefined) {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error("conversationHistory must be an array");
-  }
-
-  if (!value.every(isConversationMessage)) {
-    throw new Error("conversationHistory contains invalid messages");
-  }
-
-  return value;
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as AskRequestBody;
-    const message =
-      typeof body.message === "string" ? body.message.trim() : "";
+    const body = await req.json();
+    const question = body.question;
 
-    if (!message) {
-      return NextResponse.json(
-        { error: "message is required" },
-        { status: 400 }
-      );
-    }
+    // TEMP: static response (replace later with LLM)
+    const response = {
+      subject: "H2 Physics",
+      topic: "Forces and Motion",
+      spoken_answer:
+        "This is a free-body diagram problem. The car has weight acting downward, normal reaction upward, driving force forward, and drag acting backward.",
+      needs_visualization: true,
+      visualization_tool: "force_diagram",
+      visualization_url: "",
+      display_steps: [
+        "Weight acts downward due to gravity.",
+        "Normal reaction acts upward from the ground.",
+        "Driving force acts forward.",
+        "Drag acts opposite to motion.",
+      ],
+      diagram_data: {
+        object: "car",
+        forces: [
+          { label: "Normal reaction", direction: "up" },
+          { label: "Weight mg", direction: "down" },
+          { label: "Drag", direction: "left" },
+          { label: "Driving force", direction: "right" },
+        ],
+      },
+      exam_tip:
+        "Only draw forces acting on the object itself in a free-body diagram.",
+    };
 
-    let conversationHistory: ConversationMessage[];
-
-    try {
-      conversationHistory = parseConversationHistory(body.conversationHistory);
-    } catch (error) {
-      return NextResponse.json(
-        {
-          error:
-            error instanceof Error
-              ? error.message
-              : "conversationHistory is invalid",
-        },
-        { status: 400 }
-      );
-    }
-
-    const result = await askTutor({ message, conversationHistory });
-
-    return NextResponse.json(result);
+    return Response.json(response);
   } catch (error) {
-    console.error("Ask API error:", error);
+    console.error(error);
 
-    return NextResponse.json(
-      { error: "Failed to ask Friday Tutor" },
+    return Response.json(
+      {
+        subject: "Error",
+        topic: "Fallback",
+        spoken_answer: "Something went wrong. Please try again.",
+        needs_visualization: false,
+        visualization_tool: "none",
+        display_steps: [],
+        exam_tip: "",
+      },
       { status: 500 }
     );
   }
