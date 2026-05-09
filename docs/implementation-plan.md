@@ -1,5 +1,53 @@
 # Plan: friday-tutor — Voice-First AI Tutor (Next.js 14)
 
+---
+
+## Phase 1 Fix Plan — `lib/` Layer (Backend Track)
+
+### Current Status
+
+| File | Status | Issues |
+|---|---|---|
+| `lib/openai.ts` | ✅ Done | — |
+| `lib/tools.ts` | ❌ Needs fix | Wrong tool names, wrong parameter shapes |
+| `lib/prompts.ts` | ⚠️ Needs update | References old tool names |
+
+### What Needs to Change
+
+#### `lib/tools.ts`
+
+Replace all 3 tool definitions to match the agreed spec:
+
+1. **`show_desmos_graph`**
+   - `expressions: string[]` (array of LaTeX strings, e.g. `["y=x^2", "y=2x+1"]`)
+   - `explanation?: string` (optional narration for the student)
+   - Remove: `latex`, `xMin`, `xMax`
+
+2. **`show_molecule_3d`**
+   - `molecule_name: string` (was `name`)
+   - `smiles?: string` (keep)
+   - `pubchem_cid?: string` (replace `pdb` — use PubChem CID for lookup)
+
+3. **`show_steps_breakdown`** (currently missing — `show_force_diagram` exists instead)
+   - `steps: string[]` (ordered array of solution steps)
+   - `topic?: string` (optional label, e.g. "Quadratic Formula")
+
+#### `lib/prompts.ts`
+
+Update tool name references in the system prompt from:
+- `show_desmos_graph`, `show_molecule_3d`, `show_force_diagram` → `show_desmos_graph`, `show_molecule_3d`, `show_steps_breakdown`
+
+Add guidance on when to use `show_steps_breakdown` (worked solutions, multi-step derivations).
+
+### Execution Order
+
+1. Fix `lib/tools.ts` — rewrite all 3 tool definitions
+2. Fix `lib/prompts.ts` — update tool name list and add steps guidance
+3. Verify TypeScript compiles cleanly (`tsc --noEmit`)
+
+---
+
+
 ## Context
 
 Building a voice-first AI tutoring app for IB/A-Level students in an empty Git repo at `/Users/kaikameyama/repos/AIEhackathon`. The app uses OpenAI GPT-4o with function calling to interpret student questions (spoken) and trigger subject-specific visualizations — Desmos for mathematics, 3Dmol.js for chemistry, and custom SVG/Canvas for physics. The project name is `friday-tutor`.
