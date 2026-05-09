@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 
-const MAX_AUDIO_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024;
 
 const SUPPORTED_AUDIO_MIME_TYPES = new Set([
   "audio/flac",
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (audio.size > MAX_AUDIO_SIZE_BYTES) {
-      return badRequest("audio file must be 25 MB or smaller");
+      return badRequest("audio file must be 20 MB or smaller");
     }
 
     if (!isSupportedAudioFile(audio)) {
@@ -78,14 +78,39 @@ export async function POST(req: NextRequest) {
         ? languageValue.trim()
         : undefined;
 
-    const transcription = await openai.audio.transcriptions.create({
-      file: audio,
-      model: process.env.OPENAI_TRANSCRIPTION_MODEL ?? "gpt-4o-mini-transcribe",
-      ...(language ? { language } : {}),
+    const arrayBuffer = await audio.arrayBuffer();
+    const base64Audio = Buffer.from(arrayBuffer).toString("base64");
+    const mimeType = audio.type || "audio/webm";
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Server misconfiguration: missing GEMINI_API_KEY" },
+        { status: 500 }
+      );
+    }
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    const model = genAI.getGenerativeModel({
+      model: process.env.GEMINI_TRANSCRIPTION_MODEL ?? "gemini-2.0-flash",
     });
 
+    const languageInstruction = language
+      ? ` The audio is in ${language}.`
+      : "";
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType,
+          data: base64Audio,
+        },
+      },
+      `Transcribe this audio accurately.${languageInstruction} Return only the transcription text with no additional commentary.`,
+    ]);
+
     return NextResponse.json({
-      transcript: transcription.text,
+      transcript: result.response.text(),
     });
   } catch (error) {
     console.error("Transcription API error:", error);

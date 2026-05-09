@@ -1,8 +1,4 @@
-import type {
-  ChatCompletionMessage,
-  ChatCompletionMessageParam,
-} from "openai/resources/chat";
-import { openai } from "@/lib/openai";
+import { getGeminiClient } from "@/lib/gemini";
 import { SYSTEM_PROMPT } from "@/lib/prompts";
 import { tools } from "@/lib/tools";
 
@@ -21,54 +17,6 @@ export type AskTutorResult = {
   tool_call?: TutorToolCall;
 };
 
-type LegacyFunctionCall = {
-  name?: string;
-  arguments?: string;
-};
-
-function parseToolArguments(rawArguments: string | null | undefined) {
-  if (!rawArguments) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(rawArguments);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed
-      : {};
-  } catch (error) {
-    console.error("Failed to parse OpenAI tool arguments:", {
-      rawArguments,
-      error,
-    });
-    return {};
-  }
-}
-
-function extractToolCall(message: ChatCompletionMessage): TutorToolCall | undefined {
-  const modernToolCall = message.tool_calls?.[0];
-
-  if (modernToolCall?.type === "function") {
-    return {
-      name: modernToolCall.function.name,
-      args: parseToolArguments(modernToolCall.function.arguments),
-    };
-  }
-
-  const legacyFunctionCall = (
-    message as typeof message & { function_call?: LegacyFunctionCall }
-  ).function_call;
-
-  if (legacyFunctionCall?.name) {
-    return {
-      name: legacyFunctionCall.name,
-      args: parseToolArguments(legacyFunctionCall.arguments),
-    };
-  }
-
-  return undefined;
-}
-
 export async function askTutor({
   message,
   conversationHistory = [],
@@ -76,36 +24,42 @@ export async function askTutor({
   message: string;
   conversationHistory?: ConversationMessage[];
 }): Promise<AskTutorResult> {
-  const messages: ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...conversationHistory.map((historyMessage) => ({
-      role: historyMessage.role,
-      content: historyMessage.content,
-    })),
-    { role: "user", content: message },
-  ];
-
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_CHAT_MODEL ?? "gpt-4-turbo",
-    messages,
-    tools,
-    tool_choice: "auto",
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.0-flash",
+    systemInstruction: SYSTEM_PROMPT,
+    tools: [{ functionDeclarations: tools }],
   });
 
-  const assistantMessage = response.choices[0]?.message;
+  // Gemini history uses "user" / "model" roles; system messages are handled
+  // via systemInstruction above and must be excluded from history.
+  const history = conversationHistory
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
-  if (!assistantMessage) {
-    throw new Error("OpenAI returned no assistant message");
+  const chat = model.startChat({ history });
+  const result = await chat.sendMessage(message);
+  const response = result.response;
+
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  const functionCallPart = parts.find((p) => p.functionCall);
+  const textPart = parts.find((p) => p.text);
+
+  if (functionCallPart?.functionCall) {
+    const fc = functionCallPart.functionCall;
+    return {
+      spoken_answer: textPart?.text ?? "",
+      tool_call: {
+        name: fc.name,
+        args: (fc.args ?? {}) as Record<string, unknown>,
+      },
+    };
   }
 
-  const toolCall = extractToolCall(assistantMessage);
-  const explanationFromTool =
-    typeof toolCall?.args.explanation === "string"
-      ? toolCall.args.explanation
-      : "";
-
   return {
-    spoken_answer: assistantMessage.content ?? explanationFromTool,
-    ...(toolCall ? { tool_call: toolCall } : {}),
+    spoken_answer: response.text(),
   };
 }
