@@ -8,6 +8,14 @@ import CameraPanel, {
   type CameraPanelHandle,
   type CapturedImage,
 } from "../Components/CameraPanel";
+import TeacherPresence, {
+  readPortraitBundle,
+  readStoredTeacherBrief,
+  writePortraitBundle,
+  writeStoredTeacherBrief,
+  tryMigrateLegacyPortrait,
+  TEACHER_CHARACTER_INPUT_MAX,
+} from "../Components/TeacherPresence";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics } from "../hooks/useAnalytics";
@@ -36,37 +44,37 @@ function ThinkingOverlay({ question }: { question: string }) {
       aria-live="polite"
       className="fixed inset-0 z-40 flex items-center justify-center bg-[#09090b]/78 px-6 backdrop-blur-md"
     >
-      <div className="friday-thinking-shell relative w-full max-w-sm overflow-hidden rounded-2xl border border-indigo-500/30 bg-zinc-950/90 p-6 text-center shadow-2xl shadow-indigo-950/50">
-        <div aria-hidden className="friday-thinking-aurora" />
+      <div className="ace-thinking-shell relative w-full max-w-sm overflow-hidden rounded-2xl border border-indigo-500/30 bg-zinc-950/90 p-6 text-center shadow-2xl shadow-indigo-950/50">
+        <div aria-hidden className="ace-thinking-aurora" />
 
         <div className="relative mx-auto flex h-24 w-24 items-center justify-center">
-          <div className="friday-orbit friday-orbit-one" />
-          <div className="friday-orbit friday-orbit-two" />
+          <div className="ace-orbit ace-orbit-one" />
+          <div className="ace-orbit ace-orbit-two" />
           <Image
-            src="/friday-logo.png"
+            src="/ace-logo.png"
             alt=""
             width={48}
             height={48}
-            className="friday-logo-pulse rounded-2xl shadow-lg shadow-indigo-900/40"
+            className="ace-logo-pulse rounded-2xl shadow-lg shadow-indigo-900/40"
             priority
           />
         </div>
 
         <h2 className="relative mt-5 text-lg font-bold tracking-tight text-white">
-          Friday is thinking
+          ACE is thinking
         </h2>
         <p className="relative mt-2 line-clamp-2 text-sm leading-relaxed text-zinc-400">
           {question || "Building a clear answer..."}
         </p>
 
         <div className="relative mt-6 flex justify-center gap-2" aria-hidden>
-          <span className="friday-thinking-dot" />
-          <span className="friday-thinking-dot friday-thinking-dot-delay-one" />
-          <span className="friday-thinking-dot friday-thinking-dot-delay-two" />
+          <span className="ace-thinking-dot" />
+          <span className="ace-thinking-dot ace-thinking-dot-delay-one" />
+          <span className="ace-thinking-dot ace-thinking-dot-delay-two" />
         </div>
 
         <div className="relative mt-5 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-          <div className="friday-thinking-bar h-full rounded-full" />
+          <div className="ace-thinking-bar h-full rounded-full" />
         </div>
       </div>
     </div>
@@ -98,7 +106,7 @@ const RETAKE_PHRASES = [
 ];
 
 const SEND_PHRASES = [
-  "send the photo to friday", "send it to friday", "send to friday",
+  "send the photo to ace", "send it to ace", "send to ace",
   "send the photo", "send this photo", "send the picture", "send this picture",
   "use this photo", "use the photo", "use this picture",
   "send it",
@@ -153,7 +161,7 @@ function parseVoiceCommand(transcript: string): ParsedCommand {
   // punctuation. Looped because "um, and explain" needs two passes.
   // \b lets us also consume a filler that's the entire residual (e.g. just "and").
   let residual = text.replace(/\s+/g, " ").trim();
-  const fillerRe = /^(?:and|then|please|now|so|ok|okay|um|uh|hey|friday)\b[\s,]*/i;
+  const fillerRe = /^(?:and|then|please|now|so|ok|okay|um|uh|hey|ace)\b[\s,]*/i;
   let prev: string;
   do {
     prev = residual;
@@ -184,6 +192,10 @@ export default function LearnPage() {
   const [voiceFeedback, setVoiceFeedback] = useState<{ text: string; tone: "info" | "warn" } | null>(null);
   const [generatedImage, setGeneratedImage] = useState<GeneratedIllustration | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [teacherPortraitUrl, setTeacherPortraitUrl] = useState<string | null>(null);
+  const [teacherPortraitLoading, setTeacherPortraitLoading] = useState(false);
+  const [teacherPortraitFailed, setTeacherPortraitFailed] = useState(false);
+  const [teacherCharacterBrief, setTeacherCharacterBrief] = useState("");
 
   const { voiceId } = useVoicePreference();
   const { startSession, recordExchange, endSession } = useAnalytics();
@@ -197,7 +209,76 @@ export default function LearnPage() {
   const voiceIdRef = useRef(voiceId);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** Bumps whenever a portrait request completes out-of-order-safe. */
+  const portraitGenerationRef = useRef(0);
+
   useEffect(() => { voiceIdRef.current = voiceId; }, [voiceId]);
+
+  const requestPortrait = useCallback(async (brief: string, force: boolean) => {
+    const gen = ++portraitGenerationRef.current;
+    setTeacherPortraitLoading(true);
+    setTeacherPortraitFailed(false);
+
+    try {
+      const res = await fetch("/api/teacher-portrait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ characterBrief: brief, force }),
+      });
+      const payload = (await res.json()) as {
+        imageBase64?: string;
+        mimeType?: string;
+        error?: string;
+      };
+      if (portraitGenerationRef.current !== gen) return;
+
+      if (!res.ok) {
+        throw new Error(payload.error ?? "portrait failed");
+      }
+      const b64 = payload.imageBase64;
+      if (!b64) throw new Error("empty portrait");
+      const mime = payload.mimeType ?? "image/png";
+      const dataUrl = `data:${mime};base64,${b64}`;
+      setTeacherPortraitUrl(dataUrl);
+      writePortraitBundle({ brief, dataUrl });
+    } catch {
+      if (portraitGenerationRef.current === gen) setTeacherPortraitFailed(true);
+    } finally {
+      if (portraitGenerationRef.current === gen) setTeacherPortraitLoading(false);
+    }
+  }, []);
+
+  const handleApplyTeacherCharacter = useCallback(() => {
+    const normalized = teacherCharacterBrief
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, TEACHER_CHARACTER_INPUT_MAX);
+    setTeacherCharacterBrief(normalized);
+    writeStoredTeacherBrief(normalized);
+    void requestPortrait(normalized, true);
+  }, [teacherCharacterBrief, requestPortrait]);
+
+  useEffect(() => {
+    const briefFromLs = readStoredTeacherBrief()
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, TEACHER_CHARACTER_INPUT_MAX);
+    setTeacherCharacterBrief(briefFromLs);
+
+    const bundle = readPortraitBundle();
+    if (bundle && bundle.brief === briefFromLs && bundle.dataUrl) {
+      setTeacherPortraitUrl(bundle.dataUrl);
+      return;
+    }
+
+    if (briefFromLs === "") {
+      const migrated = tryMigrateLegacyPortrait();
+      if (migrated?.dataUrl) {
+        setTeacherPortraitUrl(migrated.dataUrl);
+      }
+    }
+    // Deliberately no Imagen call here — wait for "Update portrait".
+  }, []);
 
   useEffect(() => {
     isConversationActiveRef.current = isConversationActive;
@@ -360,7 +441,7 @@ export default function LearnPage() {
           }),
         });
         const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error ?? "Friday could not answer that yet.");
+        if (!res.ok) throw new Error(payload.error ?? "ACE could not answer that yet.");
 
         const nextResponse = payload as TutorResponse;
         setResponse(nextResponse);
@@ -620,7 +701,7 @@ export default function LearnPage() {
     listening: "Listening…",
     transcribing: "Got it, processing…",
     thinking: "Thinking…",
-    speaking: "Friday is speaking…",
+    speaking: "ACE is speaking…",
     error: "Error",
   };
 
@@ -639,8 +720,8 @@ export default function LearnPage() {
       <header className="sticky top-0 z-20 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <Link href="/" className="flex items-center gap-2.5">
-            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
-            <span className="text-sm font-semibold text-white">Friday</span>
+            <Image src="/ace-logo.png" alt="ACE logo" width={28} height={28} className="rounded-lg" />
+            <span className="text-sm font-semibold text-white">ACE</span>
           </Link>
           <nav className="flex items-center gap-3">
             <Link
@@ -660,10 +741,11 @@ export default function LearnPage() {
             Learning Session
           </p>
           <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-            Ask Friday anything
+            Ask ACE anything
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Maths, Physics, Chemistry — IB &amp; Singapore A-Levels.
+            Maths, Physics, Chemistry — IB &amp; Singapore A-Levels. The tutor illustration on the right
+            is optional — generate a portrait after you describe a look you like.
           </p>
         </div>
 
@@ -739,7 +821,7 @@ export default function LearnPage() {
                   disabled={status === "thinking" || status === "transcribing"}
                   className="mt-3 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
                 >
-                  Ask Friday
+                  Ask ACE
                 </button>
               </div>
             </details>
@@ -792,7 +874,18 @@ export default function LearnPage() {
 
           {/* RIGHT PANEL */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-            <div className="mb-4">
+            <TeacherPresence
+              status={status}
+              audioLevel={audioLevel}
+              portraitDataUrl={teacherPortraitUrl}
+              portraitLoading={teacherPortraitLoading}
+              portraitFailed={teacherPortraitFailed}
+              characterBrief={teacherCharacterBrief}
+              onCharacterBriefChange={setTeacherCharacterBrief}
+              onApplyCharacter={handleApplyTeacherCharacter}
+            />
+
+            <div className="mb-4 mt-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400">
                 Visual Explanation
               </p>

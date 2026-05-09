@@ -29,7 +29,7 @@ export default function MicButton({
     : isConversationActive
     ? isRecording
       ? "Listening — tap to send"
-      : "Friday is responding…"
+      : "ACE is responding…"
     : "Start Conversation";
 
   return (

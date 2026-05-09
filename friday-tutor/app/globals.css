@@ -19,11 +19,11 @@ body {
   }
 }
 
-.friday-thinking-shell {
-  animation: friday-overlay-in 260ms ease-out both;
+.ace-thinking-shell {
+  animation: ace-overlay-in 260ms ease-out both;
 }
 
-.friday-thinking-aurora {
+.ace-thinking-aurora {
   position: absolute;
   inset: -45%;
   background:
@@ -32,17 +32,17 @@ body {
     radial-gradient(circle at 50% 75%, rgba(244, 114, 182, 0.16), transparent 24%);
   filter: blur(28px);
   opacity: 0.85;
-  animation: friday-aurora-drift 4.8s ease-in-out infinite alternate;
+  animation: ace-aurora-drift 4.8s ease-in-out infinite alternate;
 }
 
-.friday-orbit {
+.ace-orbit {
   position: absolute;
   inset: 0;
   border-radius: 9999px;
   border: 1px solid rgba(129, 140, 248, 0.36);
 }
 
-.friday-orbit::after {
+.ace-orbit::after {
   content: "";
   position: absolute;
   right: 12px;
@@ -54,17 +54,17 @@ body {
   box-shadow: 0 0 18px rgba(165, 180, 252, 0.9);
 }
 
-.friday-orbit-one {
-  animation: friday-orbit 2.8s linear infinite;
+.ace-orbit-one {
+  animation: ace-orbit 2.8s linear infinite;
 }
 
-.friday-orbit-two {
+.ace-orbit-two {
   inset: 10px;
   border-color: rgba(45, 212, 191, 0.32);
-  animation: friday-orbit 3.6s linear infinite reverse;
+  animation: ace-orbit 3.6s linear infinite reverse;
 }
 
-.friday-orbit-two::after {
+.ace-orbit-two::after {
   right: auto;
   left: 8px;
   top: 18px;
@@ -72,33 +72,33 @@ body {
   box-shadow: 0 0 18px rgba(94, 234, 212, 0.75);
 }
 
-.friday-logo-pulse {
-  animation: friday-logo-pulse 1.8s ease-in-out infinite;
+.ace-logo-pulse {
+  animation: ace-logo-pulse 1.8s ease-in-out infinite;
 }
 
-.friday-thinking-dot {
+.ace-thinking-dot {
   height: 8px;
   width: 8px;
   border-radius: 9999px;
   background: #c7d2fe;
-  animation: friday-dot-bounce 1s ease-in-out infinite;
+  animation: ace-dot-bounce 1s ease-in-out infinite;
 }
 
-.friday-thinking-dot-delay-one {
+.ace-thinking-dot-delay-one {
   animation-delay: 140ms;
 }
 
-.friday-thinking-dot-delay-two {
+.ace-thinking-dot-delay-two {
   animation-delay: 280ms;
 }
 
-.friday-thinking-bar {
+.ace-thinking-bar {
   width: 42%;
   background: linear-gradient(90deg, #818cf8, #2dd4bf, #f0abfc);
-  animation: friday-progress-sweep 1.35s ease-in-out infinite;
+  animation: ace-progress-sweep 1.35s ease-in-out infinite;
 }
 
-@keyframes friday-overlay-in {
+@keyframes ace-overlay-in {
   from {
     opacity: 0;
     transform: translateY(12px) scale(0.98);
@@ -109,7 +109,7 @@ body {
   }
 }
 
-@keyframes friday-aurora-drift {
+@keyframes ace-aurora-drift {
   from {
     transform: rotate(0deg) scale(1);
   }
@@ -118,13 +118,13 @@ body {
   }
 }
 
-@keyframes friday-orbit {
+@keyframes ace-orbit {
   to {
     transform: rotate(360deg);
   }
 }
 
-@keyframes friday-logo-pulse {
+@keyframes ace-logo-pulse {
   0%,
   100% {
     transform: scale(1);
@@ -136,7 +136,7 @@ body {
   }
 }
 
-@keyframes friday-dot-bounce {
+@keyframes ace-dot-bounce {
   0%,
   80%,
   100% {
@@ -149,7 +149,7 @@ body {
   }
 }
 
-@keyframes friday-progress-sweep {
+@keyframes ace-progress-sweep {
   0% {
     transform: translateX(-120%);
   }
@@ -158,14 +158,93 @@ body {
   }
 }
 
+@keyframes ace-teacher-mouth-bob {
+  from {
+    transform: scaleY(0.55);
+  }
+  to {
+    transform: scaleY(1.15);
+  }
+}
+
+.ace-teacher-mouth-bob {
+  transform-origin: 110px 126px;
+  animation: ace-teacher-mouth-bob 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes ace-teacher-speak-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.32);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(129, 140, 248, 0.06);
+  }
+}
+
+.ace-teacher-speak-ring {
+  animation: ace-teacher-speak-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes ace-teacher-think-hint {
+  0%,
+  100% {
+    border-color: rgba(82, 82, 91, 0.95);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.12);
+  }
+  50% {
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0.04);
+  }
+}
+
+.ace-teacher-think-ring {
+  animation: ace-teacher-think-hint 1.5s ease-in-out infinite;
+}
+
+@keyframes ace-teacher-think-glow-shift {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-6px, 4px) scale(1.05);
+  }
+}
+
+.ace-teacher-think-glow {
+  animation: ace-teacher-think-glow-shift 2.8s ease-in-out infinite;
+}
+
+@keyframes ace-teacher-portrait-ken {
+  0%,
+  100% {
+    transform: scale(1.03);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+.ace-teacher-portrait-ken {
+  animation: ace-teacher-portrait-ken 2.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .friday-thinking-shell,
-  .friday-thinking-aurora,
-  .friday-orbit-one,
-  .friday-orbit-two,
-  .friday-logo-pulse,
-  .friday-thinking-dot,
-  .friday-thinking-bar {
+  .ace-thinking-shell,
+  .ace-thinking-aurora,
+  .ace-orbit-one,
+  .ace-orbit-two,
+  .ace-logo-pulse,
+  .ace-thinking-dot,
+  .ace-thinking-bar,
+  .ace-teacher-mouth-bob,
+  .ace-teacher-speak-ring,
+  .ace-teacher-think-ring,
+  .ace-teacher-think-glow,
+  .ace-teacher-portrait-ken {
     animation: none;
   }
 }

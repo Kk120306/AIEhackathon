@@ -249,7 +249,7 @@ function SessionTimeline({ sessions }: { sessions: SessionRecord[] }) {
     return (
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
         <SectionHeader label="Session History" />
-        <p className="mt-4 text-sm text-zinc-600">No sessions yet. Start a conversation with Friday!</p>
+        <p className="mt-4 text-sm text-zinc-600">No sessions yet. Start a conversation with ACE!</p>
       </div>
     );
   }
@@ -478,8 +478,8 @@ function ParentalControlsComingSoon() {
 
       <div className="space-y-4">
         <ParentalFeatureShell
-          title="Custom guidelines for Friday"
-          description="Text you add will be merged into the tutor prompt so Friday follows your house rules (tone, level, topics to avoid)."
+          title="Custom guidelines for ACE"
+          description="Text you add will be merged into the tutor prompt so ACE follows your house rules (tone, level, topics to avoid)."
         >
           <label className="sr-only">Example parent guidelines</label>
           <textarea
@@ -524,7 +524,7 @@ function ParentalControlsComingSoon() {
           description="Reduce off-subject tangents and keep the chat on learning."
         >
           <div className="flex items-center justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/80 px-3 py-3">
-            <p className="text-xs text-zinc-500">When on, Friday steers back to academics more aggressively.</p>
+            <p className="text-xs text-zinc-500">When on, ACE steers back to academics more aggressively.</p>
             <span className="relative inline-flex h-6 w-11 shrink-0 rounded-full bg-zinc-700 opacity-60" aria-hidden>
               <span className="absolute right-1 top-1 h-4 w-4 rounded-full bg-zinc-500" />
             </span>
@@ -609,17 +609,19 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-[#09090b] text-white">
       {/* ── Top bar ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md px-6 py-3.5">
-        <div className="mx-auto max-w-6xl flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
-            <div>
-              <span className="text-sm font-semibold text-white">Friday</span>
-              <span className="ml-2 text-xs font-medium text-zinc-500">Parent Dashboard</span>
+      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md px-4 py-3.5 sm:px-6">
+        <div className="mx-auto max-w-6xl flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
+            <Image src="/ace-logo.png" alt="ACE logo" width={28} height={28} className="rounded-lg" />
+            <div className="min-w-0 leading-tight">
+              <span className="text-sm font-semibold text-white">ACE</span>
+              <span className="mt-0.5 block text-xs font-medium text-zinc-500 sm:ml-2 sm:mt-0 sm:inline">
+                Parent Dashboard
+              </span>
             </div>
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {/* Tab switcher */}
             <div className="flex items-center rounded-lg border border-zinc-700 bg-zinc-900 p-1">
               {(["analytics", "settings"] as const).map((t) => (
@@ -647,7 +649,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8 space-y-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 space-y-8">
 
         {/* ── ANALYTICS TAB ───────────────────────────────── */}
         {tab === "analytics" && (
@@ -689,7 +691,7 @@ export default function DashboardPage() {
                 <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
                   <SectionHeader label="Answer Accuracy" />
                   <p className="mt-4 text-sm text-zinc-600">
-                    Accuracy tracking kicks in once Friday marks answers as correct or incorrect during practice.
+                    Accuracy tracking kicks in once ACE marks answers as correct or incorrect during practice.
                   </p>
                 </div>
               )}
@@ -732,40 +734,44 @@ export default function DashboardPage() {
 
         {/* ── SETTINGS TAB ────────────────────────────────── */}
         {tab === "settings" && (
-          <div className="max-w-2xl space-y-6">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-              <p className="text-xs uppercase tracking-widest text-indigo-400 mb-1">Voice Settings</p>
-              <h2 className="text-2xl font-bold mb-1">Friday&apos;s Voice</h2>
-              <p className="text-sm text-zinc-400 mb-5">
-                Choose how Friday speaks to your child. Changes take effect immediately.
-              </p>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,22rem)_1fr] lg:items-start xl:grid-cols-[minmax(0,26rem)_1fr] xl:gap-10">
+            <section className="min-w-0 lg:sticky lg:top-20">
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+                <p className="mb-1 text-xs uppercase tracking-widest text-indigo-400">Voice Settings</p>
+                <h2 className="mb-1 text-xl font-bold sm:text-2xl">ACE&apos;s Voice</h2>
+                <p className="mb-5 text-sm text-zinc-400">
+                  Choose how ACE speaks to your child. Changes take effect immediately.
+                </p>
 
-              {voicesLoading ? (
-                <p className="text-sm text-zinc-500">Loading voices…</p>
-              ) : voicesError ? (
-                <p className="text-sm text-red-400">{voicesError}</p>
-              ) : (
-                <select
-                  value={voiceId}
-                  onChange={(e) => handleVoiceChange(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500 cursor-pointer"
-                >
-                  {voices.map((v) => (
-                    <option key={v.voice_id} value={v.voice_id} className="bg-zinc-900">
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+                {voicesLoading ? (
+                  <p className="text-sm text-zinc-500">Loading voices…</p>
+                ) : voicesError ? (
+                  <p className="text-sm text-red-400">{voicesError}</p>
+                ) : (
+                  <select
+                    value={voiceId}
+                    onChange={(e) => handleVoiceChange(e.target.value)}
+                    className="w-full max-w-full cursor-pointer rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  >
+                    {voices.map((v) => (
+                      <option key={v.voice_id} value={v.voice_id} className="bg-zinc-900">
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
-              {saveStatus === "saved" && (
-                <p className="mt-3 text-xs text-green-400">Voice preference saved.</p>
-              )}
+                {saveStatus === "saved" && (
+                  <p className="mt-3 text-xs text-green-400">Voice preference saved.</p>
+                )}
 
-              <VoicePreview voiceId={voiceId} />
-            </div>
+                <VoicePreview voiceId={voiceId} />
+              </div>
+            </section>
 
-            <ParentalControlsComingSoon />
+            <section className="min-w-0">
+              <ParentalControlsComingSoon />
+            </section>
           </div>
         )}
       </div>
@@ -792,7 +798,7 @@ function VoicePreview({ voiceId }: { voiceId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: "Hi! I'm Friday, your AI tutor. I'm here to help you ace your exams.",
+          text: "Hi! I'm ACE, your AI tutor. I'm here to help you ace your exams.",
           voiceId,
         }),
       });
@@ -815,7 +821,7 @@ function VoicePreview({ voiceId }: { voiceId: string }) {
     <button
       onClick={handlePreview}
       disabled={loading}
-      className="mt-5 flex items-center gap-2 rounded-xl border border-indigo-700 bg-indigo-950/40 px-4 py-2 text-sm font-semibold text-indigo-300 hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+      className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-700 bg-indigo-950/40 px-4 py-2.5 text-sm font-semibold text-indigo-300 hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors sm:w-auto sm:justify-start"
     >
       {loading ? (
         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />

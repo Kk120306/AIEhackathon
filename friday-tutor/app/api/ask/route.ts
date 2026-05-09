@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     console.error("Ask API error:", error);
 
     return NextResponse.json(
-      { error: "Failed to ask Friday Tutor" },
+      { error: "Failed to ask ACE Tutor" },
       { status: 500 }
     );
   }

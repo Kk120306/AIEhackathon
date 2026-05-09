@@ -41,7 +41,7 @@ export interface CameraPanelHandle {
 
 interface CameraPanelProps {
   /**
-   * Optional: fired when the student taps "Send to Friday" on a captured photo
+   * Optional: fired when the student taps "Send to ACE" on a captured photo
    * or attached file. If omitted, the panel just arms the attachment and the
    * parent reads it off the ref the next time the student asks a question.
    */
@@ -387,7 +387,7 @@ const CameraPanel = forwardRef<CameraPanelHandle, CameraPanelProps>(
                 </p>
                 <p className="mt-1 text-[11px] text-zinc-400">
                   {snapshot.fileSize ? formatBytes(snapshot.fileSize) : "PDF document"}
-                  {" · "}Friday will read every page
+                  {" · "}ACE will read every page
                 </p>
               </div>
             </div>
@@ -460,7 +460,7 @@ const CameraPanel = forwardRef<CameraPanelHandle, CameraPanelProps>(
                 onClick={handleSend}
                 className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
               >
-                Send to Friday
+                Send to ACE
               </button>
               <button
                 type="button"
@@ -482,7 +482,7 @@ const CameraPanel = forwardRef<CameraPanelHandle, CameraPanelProps>(
         <p className="border-t border-zinc-800 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">
           Hold the page steady, fill the frame with the question, and tap{" "}
           <span className="text-zinc-300">Take photo</span>. Or attach a multi-page
-          PDF — Friday will ask which question you want to look at.
+          PDF — ACE will ask which question you want to look at.
         </p>
       </div>
     );

@@ -68,7 +68,7 @@ export default function ForceDiagram({ data }: ForceDiagramProps) {
       </div>
 
       <p className="mt-4 text-sm text-gray-400">
-        Friday generated this custom diagram from the physical situation in the
+        ACE generated this custom diagram from the physical situation in the
         question.
       </p>
     </div>

@@ -92,7 +92,7 @@ export async function askTutor({
   });
 
   if (imageBase64) {
-    // Helpful when debugging "Friday isn't seeing the question" — confirms the
+    // Helpful when debugging "ACE isn't seeing the question" — confirms the
     // frame actually reaches the model and roughly how big it is.
     const sizeKb = Math.round((imageBase64.length * 3) / 4 / 1024);
     console.log(`[askTutor] image attached: ~${sizeKb}KB ${imageMimeType}`);

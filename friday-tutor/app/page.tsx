@@ -8,7 +8,7 @@ const features = [
     icon: "🎙️",
     title: "Voice-first learning",
     description:
-      "Talk to Friday naturally, hands-free. No typing, no clicking — just ask your question and listen to a clear, exam-ready explanation.",
+      "Talk to ACE naturally, hands-free. No typing, no clicking — just ask your question and listen to a clear, exam-ready explanation.",
   },
   {
     icon: "📊",
@@ -20,7 +20,7 @@ const features = [
     icon: "🧪",
     title: "IB & A-Level syllabus",
     description:
-      "Maths, Physics, and Chemistry topics mapped to the IB and Singapore A-Level curricula. Friday knows the marking schemes, not just the concepts.",
+      "Maths, Physics, and Chemistry topics mapped to the IB and Singapore A-Level curricula. ACE knows the marking schemes, not just the concepts.",
   },
 ];
 
@@ -35,12 +35,12 @@ const steps = [
   {
     number: "02",
     title: "Ask your question",
-    description: "Speak naturally. Friday transcribes, thinks, and answers in seconds.",
+    description: "Speak naturally. ACE transcribes, thinks, and answers in seconds.",
   },
   {
     number: "03",
     title: "See it visualised",
-    description: "Graphs, molecules, or worked steps appear beside Friday's spoken answer.",
+    description: "Graphs, molecules, or worked steps appear beside ACE's spoken answer.",
   },
 ];
 
@@ -53,8 +53,8 @@ export default function LandingPage() {
       <header className="sticky top-0 z-20 border-b border-zinc-800/60 bg-[#09090b]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-2.5">
-            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
-            <span className="text-sm font-semibold text-white tracking-tight">Friday</span>
+            <Image src="/ace-logo.png" alt="ACE logo" width={28} height={28} className="rounded-lg" />
+            <span className="text-sm font-semibold text-white tracking-tight">ACE</span>
           </div>
           <nav className="flex items-center gap-3">
             <Link
@@ -93,7 +93,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-zinc-400">
-            Friday listens, explains, and visualises — hands-free. Ask any Maths, Physics,
+            ACE listens, explains, and visualises — hands-free. Ask any Maths, Physics,
             or Chemistry question and get a clear, syllabus-aligned answer in seconds.
           </p>
 
@@ -115,7 +115,7 @@ export default function LandingPage() {
       <section className="mx-auto max-w-6xl px-6 pb-24">
         <div className="mb-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400">
-            Why Friday
+            Why ACE
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight">
             Built for how students actually learn
@@ -175,7 +175,7 @@ export default function LandingPage() {
             Ready to start learning?
           </h2>
           <p className="mx-auto mt-3 max-w-sm text-sm text-zinc-400">
-            No sign-up needed. Just open a session and start talking to Friday.
+            No sign-up needed. Just open a session and start talking to ACE.
           </p>
           <Link
             href="/learn"
@@ -191,8 +191,8 @@ export default function LandingPage() {
       <footer className="border-t border-zinc-800 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <Image src="/friday-logo.png" alt="Friday logo" width={24} height={24} className="rounded-md opacity-70" />
-            <span className="text-sm font-semibold text-zinc-400">Friday</span>
+            <Image src="/ace-logo.png" alt="ACE logo" width={24} height={24} className="rounded-md opacity-70" />
+            <span className="text-sm font-semibold text-zinc-400">ACE</span>
           </div>
           <nav className="flex items-center gap-5 text-xs text-zinc-500">
             <Link href="/learn" className="hover:text-zinc-300 transition-colors">

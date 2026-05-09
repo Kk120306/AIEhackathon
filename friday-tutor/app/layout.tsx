@@ -15,11 +15,11 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Friday — AI Tutor for IB & A-Levels",
+  title: "ACE — AI Tutor for IB & A-Levels",
   description: "Voice-first AI tutor for IB and Singapore A-Level students. Ask anything in Maths, Physics, or Chemistry.",
   icons: {
-    icon: "/friday-logo.png",
-    apple: "/friday-logo.png",
+    icon: "/ace-logo.png",
+    apple: "/ace-logo.png",
   },
 };
 

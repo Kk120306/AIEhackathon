@@ -52,7 +52,7 @@ export default function GeneratedImagePanel({
             type="button"
             onClick={onClose}
             className="rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-white"
-            title="Close the illustration and return to Friday's answer"
+            title="Close the illustration and return to ACE's answer"
           >
             ✕ Close
           </button>

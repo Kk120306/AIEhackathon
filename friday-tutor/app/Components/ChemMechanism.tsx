@@ -40,7 +40,7 @@ export default function ChemMechanism({ steps }: ChemMechanismProps) {
 
       <div className="mt-6 rounded-xl border border-purple-800 bg-purple-950/40 p-4">
         <p className="text-sm text-purple-200">
-          Friday uses this panel for reaction mechanisms and MolView for
+          ACE uses this panel for reaction mechanisms and MolView for
           molecular structures.
         </p>
       </div>

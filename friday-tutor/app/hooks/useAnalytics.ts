@@ -35,7 +35,7 @@ export type AnalyticsData = {
   totalIncorrect: number;
 };
 
-const STORAGE_KEY = "friday_tutor_analytics";
+const STORAGE_KEY = "ace_tutor_analytics";
 const MAX_SESSIONS = 50;
 
 function guessSubject(topic?: string): Subject {

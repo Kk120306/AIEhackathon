@@ -27,13 +27,14 @@ export const tools: FunctionDeclaration[] = [
   {
     name: "show_molecule_3d",
     description:
-      "Render a 3D molecular structure using 3Dmol.js. Use for any chemistry question involving a specific compound or structure.",
+      "Render an interactive 3D structure via MolView. Use for discrete molecules, ions that exist as formulas in databases, or a clear structural analogue. Not for ambiguous macroscopic objects (do not confuse with aircraft or physics 'planes').",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         molecule_name: {
           type: SchemaType.STRING,
-          description: "Common or IUPAC name of the molecule, e.g. 'ethanol'",
+          description:
+            "Human-readable label shown in the UI, e.g. 'ethanol', 'nitrate ion', 'adamantane (diamond analogue)'. Required even if smiles or cid is supplied.",
         },
         smiles: {
           type: SchemaType.STRING,
@@ -42,7 +43,7 @@ export const tools: FunctionDeclaration[] = [
         pubchem_cid: {
           type: SchemaType.STRING,
           description:
-            "PubChem Compound ID if known, e.g. '702' for ethanol. Used to fetch structure data from PubChem.",
+            "PubChem Compound ID if known, e.g. '702' for ethanol. Preferred when you know it (reliable loads). Example: adamantane (tetrahedral sp³ cage) is CID 9238 — useful when discussing diamond bonding.",
         },
       },
       required: ["molecule_name"],
@@ -51,7 +52,7 @@ export const tools: FunctionDeclaration[] = [
   {
     name: "show_steps_breakdown",
     description:
-      "Display a numbered, step-by-step worked solution in the steps panel. Use for multi-step calculations, derivations, or proofs where showing the working is important.",
+      "Display a numbered, step-by-step worked solution in the steps panel. Use for multi-step calculations, derivations, proofs, and physics force problems (e.g. objects at constant velocity or terminal speed) where showing the working is important.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {

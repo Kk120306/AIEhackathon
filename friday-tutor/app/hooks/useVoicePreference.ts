@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const STORAGE_KEY = "friday_tutor_voice_id";
+const STORAGE_KEY = "ace_tutor_voice_id";
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel
 
 export function useVoicePreference() {

@@ -51,20 +51,32 @@ function DesmosPanel({ expressions }: { expressions: string[] }) {
 function MoleculePanel({
   moleculeName,
   pubchemCid,
+  smiles,
 }: {
   moleculeName: string;
   pubchemCid?: string;
+  smiles?: string;
 }) {
-  const src = pubchemCid
-    ? `https://embed.molview.org/v1/?mode=3Dmol&cid=${pubchemCid}`
-    : `https://embed.molview.org/v1/?mode=3Dmol&q=${encodeURIComponent(moleculeName)}`;
+  // MolView embed (see molview embed HTML comments): cid | smiles | q (name resolution), mode = stick/balls/etc.
+  const params = new URLSearchParams();
+  const cid = pubchemCid?.trim();
+  const sm = smiles?.trim();
+  const q = moleculeName.trim();
+  if (cid) params.set("cid", cid);
+  else if (sm) params.set("smiles", sm);
+  else if (q) params.set("q", q);
+  else params.set("q", "water");
+  params.set("mode", "stick");
+
+  const src = `https://embed.molview.org/v1/?${params}`;
+  const label = q || (cid ? `CID ${cid}` : sm ?? "structure");
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-blue-300">{moleculeName}</p>
+      <p className="text-sm font-semibold text-blue-300">{label}</p>
       <iframe
         src={src}
-        title={`3D structure of ${moleculeName}`}
+        title={`3D structure of ${label}`}
         className="w-full h-[480px] rounded-xl border border-gray-700"
         allow="fullscreen"
       />
@@ -100,7 +112,7 @@ function StepsPanel({ steps, topic }: { steps: string[]; topic?: string }) {
   );
 }
 
-// ── Generate illustration (above Friday's answer / visualisation) ─────────────
+// ── Generate illustration (above ACE's answer / visualisation) ─────────────
 
 function IllustrationActionBar({
   onGenerate,
@@ -134,7 +146,7 @@ function IllustrationActionBar({
         )}
       </button>
       <p className="mt-2 text-center text-[11px] text-zinc-500">
-        Optional — illustration opens at the top; Friday&apos;s written answer stays below it
+        Optional — graphs and diagrams appear above ACE&apos;s written answer
       </p>
     </div>
   );
@@ -147,7 +159,7 @@ function AnswerDisplay({ response }: { response: TutorResponse }) {
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
-        Friday&apos;s answer
+        ACE&apos;s answer
       </p>
       {response.topic && (
         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-400">
@@ -215,7 +227,7 @@ export default function VisualizationPanel({
     return (
       <div className="flex h-64 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/50">
         <p className="text-sm text-zinc-500">
-          Friday&apos;s answer and visualisations will appear here.
+          ACE&apos;s answer and visualisations will appear here.
         </p>
       </div>
     );
@@ -231,13 +243,13 @@ export default function VisualizationPanel({
           onGenerate={onGenerateImage!}
           isGenerating={isGeneratingImage ?? false}
         />
-        <AnswerDisplay response={response} />
         {viz}
+        <AnswerDisplay response={response} />
       </div>
     ) : (
       <div className="space-y-4">
-        <AnswerDisplay response={response} />
         {viz}
+        <AnswerDisplay response={response} />
       </div>
     );
 
@@ -257,6 +269,7 @@ export default function VisualizationPanel({
         <MoleculePanel
           moleculeName={String(args.molecule_name ?? "")}
           pubchemCid={args.pubchem_cid ? String(args.pubchem_cid) : undefined}
+          smiles={args.smiles ? String(args.smiles) : undefined}
         />
       );
     }
