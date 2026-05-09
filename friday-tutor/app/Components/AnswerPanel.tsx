@@ -1,4 +1,9 @@
-import type { TutorResponse } from "../page";
+"use client";
+
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import type { TutorResponse } from "../types";
 
 export default function AnswerPanel({
   question,
@@ -27,7 +32,20 @@ export default function AnswerPanel({
               {response.topic}
             </p>
           )}
-          <p className="mt-1 text-white">{response.spoken_answer}</p>
+          <div className="mt-1 text-white prose prose-invert prose-sm max-w-none
+            [&_.katex]:text-white
+            [&_p]:leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0
+            [&_ul]:pl-5 [&_ul]:mb-3 [&_li]:mb-1
+            [&_ol]:pl-5 [&_ol]:mb-3
+            [&_strong]:font-semibold [&_strong]:text-white
+            [&_code]:bg-zinc-800 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-indigo-300 [&_code]:text-xs">
+            <ReactMarkdown
+              remarkPlugins={[remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {response.display_answer ?? response.spoken_answer}
+            </ReactMarkdown>
+          </div>
 
           {typeof response.is_correct === "boolean" && (
             <p
