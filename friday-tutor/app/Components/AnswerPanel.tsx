@@ -1,32 +1,41 @@
-export default function AnswerPanel({ question, response }: any) {
+import type { TutorResponse } from "../page";
+
+export default function AnswerPanel({
+  question,
+  response,
+}: {
+  question: string;
+  response: TutorResponse | null;
+}) {
+  if (!question && !response) return null;
+
   return (
-    <div className="mt-6 bg-gray-900 p-4 rounded-xl">
+    <div className="mt-6 rounded-xl bg-gray-900 p-4">
       {question && (
         <>
-          <p className="text-gray-400">You asked:</p>
-          <p className="mb-4">{question}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            You said
+          </p>
+          <p className="mt-1 mb-4 text-gray-200">{question}</p>
         </>
       )}
 
       {response && (
         <>
-          <p className="text-blue-400 font-semibold">
-            {response.subject} — {response.topic}
-          </p>
-
-          <p className="mt-2">{response.spoken_answer}</p>
-
-          {response.display_steps && (
-            <ul className="mt-4 list-disc pl-5">
-              {response.display_steps.map((step: string, i: number) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ul>
+          {response.topic && (
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-400">
+              {response.topic}
+            </p>
           )}
+          <p className="mt-1 text-white">{response.spoken_answer}</p>
 
-          {response.exam_tip && (
-            <p className="mt-4 text-green-400">
-              💡 {response.exam_tip}
+          {typeof response.is_correct === "boolean" && (
+            <p
+              className={`mt-3 text-sm font-semibold ${
+                response.is_correct ? "text-green-400" : "text-yellow-400"
+              }`}
+            >
+              {response.is_correct ? "✓ Correct" : "Not quite — keep going!"}
             </p>
           )}
         </>
