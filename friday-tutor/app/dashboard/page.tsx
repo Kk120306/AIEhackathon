@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics, type SessionRecord, type Subject } from "../hooks/useAnalytics";
 
@@ -496,9 +497,7 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md px-6 py-3.5">
         <div className="mx-auto max-w-6xl flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
-              F
-            </span>
+            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
             <div>
               <span className="text-sm font-semibold text-white">Friday</span>
               <span className="ml-2 text-xs font-medium text-zinc-500">Parent Dashboard</span>

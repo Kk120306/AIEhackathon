@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 // ── Feature cards ──────────────────────────────────────────────────────────────
 
@@ -52,9 +53,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-20 border-b border-zinc-800/60 bg-[#09090b]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
-              F
-            </span>
+            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
             <span className="text-sm font-semibold text-white tracking-tight">Friday</span>
           </div>
           <nav className="flex items-center gap-3">
@@ -204,9 +203,7 @@ export default function LandingPage() {
       <footer className="border-t border-zinc-800 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600 text-xs font-bold text-white">
-              F
-            </span>
+            <Image src="/friday-logo.png" alt="Friday logo" width={24} height={24} className="rounded-md opacity-70" />
             <span className="text-sm font-semibold text-zinc-400">Friday</span>
           </div>
           <nav className="flex items-center gap-5 text-xs text-zinc-500">

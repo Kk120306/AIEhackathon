@@ -10,6 +10,7 @@ import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics } from "../hooks/useAnalytics";
 import type { AppStatus, ConversationMessage, TutorResponse } from "../types";
 import Link from "next/link";
+import Image from "next/image";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -302,10 +303,8 @@ export default function LearnPage() {
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
-              F
-            </span>
+          <Link href="/" className="flex items-center gap-2.5">
+            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
             <span className="text-sm font-semibold text-white">Friday</span>
           </Link>
           <nav className="flex items-center gap-3">
