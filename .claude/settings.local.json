@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p docs)",
+      "Bash(npx create-next-app@14 friday-tutor --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --eslint --no-git)",
+      "Bash(git add *)",
+      "Bash(git push *)"
+    ],
+    "additionalDirectories": [
+      "/Users/kaikameyama/repos/AIEhackathon"
+    ]
+  }
+}
