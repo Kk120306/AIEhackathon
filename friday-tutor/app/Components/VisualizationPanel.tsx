@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { TutorResponse } from "../page";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import type { TutorResponse } from "../types";
 
 // ── Desmos graph ──────────────────────────────────────────────────────────────
 
@@ -72,20 +75,57 @@ function MoleculePanel({
 
 function StepsPanel({ steps, topic }: { steps: string[]; topic?: string }) {
   return (
-    <div className="rounded-xl border border-gray-700 bg-gray-900 p-5 space-y-3">
+    <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-3">
       {topic && (
-        <p className="text-sm font-bold uppercase tracking-wider text-blue-400">{topic}</p>
+        <p className="text-sm font-bold uppercase tracking-wider text-indigo-400">{topic}</p>
       )}
-      <ol className="space-y-3">
+      <ol className="space-y-4">
         {steps.map((step, i) => (
           <li key={i} className="flex gap-3">
-            <span className="flex-none w-6 h-6 rounded-full bg-green-500 text-black text-xs font-bold flex items-center justify-center">
+            <span className="flex-none w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center mt-0.5">
               {i + 1}
             </span>
-            <span className="text-gray-200 leading-relaxed">{step}</span>
+            <div className="text-zinc-200 leading-relaxed prose prose-invert prose-sm max-w-none
+              [&_.katex]:text-white
+              [&_p]:mb-0 [&_p]:leading-relaxed">
+              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                {step}
+              </ReactMarkdown>
+            </div>
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+// ── Answer panel (shown in right panel when no tool is active) ────────────────
+
+function AnswerDisplay({ response }: { response: TutorResponse }) {
+  const content = response.display_answer ?? response.spoken_answer;
+  return (
+    <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+      {response.topic && (
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-indigo-400">
+          {response.topic}
+        </p>
+      )}
+      <div className="text-zinc-100 prose prose-invert prose-sm max-w-none
+        [&_.katex]:text-white
+        [&_p]:leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0
+        [&_ul]:pl-5 [&_ul]:mb-3 [&_li]:mb-1
+        [&_ol]:pl-5 [&_ol]:mb-3
+        [&_strong]:font-semibold [&_strong]:text-white
+        [&_code]:bg-zinc-800 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-indigo-300 [&_code]:text-xs">
+        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+          {content}
+        </ReactMarkdown>
+      </div>
+      {typeof response.is_correct === "boolean" && (
+        <p className={`mt-4 text-sm font-semibold ${response.is_correct ? "text-emerald-400" : "text-yellow-400"}`}>
+          {response.is_correct ? "✓ Correct" : "Not quite — keep going!"}
+        </p>
+      )}
     </div>
   );
 }
@@ -97,38 +137,43 @@ export default function VisualizationPanel({
 }: {
   response: TutorResponse | null;
 }) {
-  if (!response?.tool_call) {
+  // No response yet — show placeholder
+  if (!response) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-xl border border-gray-800 bg-gray-900">
-        <p className="text-sm text-gray-500">
-          Visualisation will appear here when Friday uses a tool.
+      <div className="flex h-64 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/50">
+        <p className="text-sm text-zinc-500">
+          Friday&apos;s answer and visualisations will appear here.
         </p>
       </div>
     );
   }
 
-  const { name, args } = response.tool_call;
+  // Tool call present — render the appropriate visualisation
+  if (response.tool_call) {
+    const { name, args } = response.tool_call;
 
-  if (name === "show_desmos_graph") {
-    const expressions = Array.isArray(args.expressions)
-      ? (args.expressions as string[])
-      : [];
-    return <DesmosPanel expressions={expressions} />;
+    if (name === "show_desmos_graph") {
+      const expressions = Array.isArray(args.expressions)
+        ? (args.expressions as string[])
+        : [];
+      return <DesmosPanel expressions={expressions} />;
+    }
+
+    if (name === "show_molecule_3d") {
+      return (
+        <MoleculePanel
+          moleculeName={String(args.molecule_name ?? "")}
+          pubchemCid={args.pubchem_cid ? String(args.pubchem_cid) : undefined}
+        />
+      );
+    }
+
+    if (name === "show_steps_breakdown") {
+      const steps = Array.isArray(args.steps) ? (args.steps as string[]) : [];
+      return <StepsPanel steps={steps} topic={args.topic ? String(args.topic) : undefined} />;
+    }
   }
 
-  if (name === "show_molecule_3d") {
-    return (
-      <MoleculePanel
-        moleculeName={String(args.molecule_name ?? "")}
-        pubchemCid={args.pubchem_cid ? String(args.pubchem_cid) : undefined}
-      />
-    );
-  }
-
-  if (name === "show_steps_breakdown") {
-    const steps = Array.isArray(args.steps) ? (args.steps as string[]) : [];
-    return <StepsPanel steps={steps} topic={args.topic ? String(args.topic) : undefined} />;
-  }
-
-  return null;
+  // No tool call — show the answer with LaTeX in the right panel
+  return <AnswerDisplay response={response} />;
 }
