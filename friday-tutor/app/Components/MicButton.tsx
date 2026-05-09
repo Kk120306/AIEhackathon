@@ -1,6 +1,6 @@
 "use client";
 
-import type { AppStatus } from "../page";
+import type { AppStatus } from "../types";
 
 interface MicButtonProps {
   isConversationActive: boolean;

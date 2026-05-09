@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics, type SessionRecord, type Subject } from "../hooks/useAnalytics";
 
@@ -41,7 +42,7 @@ const SUBJECT_COLORS: Record<Subject, string> = {
   math:       "text-blue-400 bg-blue-950/60 border-blue-800",
   physics:    "text-amber-400 bg-amber-950/60 border-amber-800",
   chemistry:  "text-emerald-400 bg-emerald-950/60 border-emerald-800",
-  other:      "text-gray-400 bg-gray-900 border-gray-700",
+  other:      "text-zinc-400 bg-zinc-900 border-zinc-700",
 };
 
 const SUBJECT_BAR: Record<Subject, string> = {
@@ -80,10 +81,10 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-5 flex flex-col gap-1">
-      <p className="text-xs uppercase tracking-widest text-gray-500">{label}</p>
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col gap-1">
+      <p className="text-xs uppercase tracking-widest text-zinc-500">{label}</p>
       <p className={`text-3xl font-bold tabular-nums ${accent ?? "text-white"}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-500">{sub}</p>}
+      {sub && <p className="text-xs text-zinc-500">{sub}</p>}
     </div>
   );
 }
@@ -105,15 +106,15 @@ function TopicsBreakdown({ sessions }: { sessions: SessionRecord[] }) {
 
   if (freq.length === 0) {
     return (
-      <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
         <SectionHeader label="Topics Covered" />
-        <p className="mt-4 text-sm text-gray-600">No topics recorded yet.</p>
+        <p className="mt-4 text-sm text-zinc-600">No topics recorded yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
       <SectionHeader label="Topics Covered" badge={`${freq.length} topics`} />
       <div className="mt-5 space-y-3">
         {freq.map(([topic, count]) => {
@@ -125,11 +126,11 @@ function TopicsBreakdown({ sessions }: { sessions: SessionRecord[] }) {
                 <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${SUBJECT_COLORS[subj]}`}>
                   {topic}
                 </span>
-                <span className="text-xs tabular-nums text-gray-500">
+                <span className="text-xs tabular-nums text-zinc-500">
                   {count} {count === 1 ? "question" : "questions"}
                 </span>
               </div>
-              <div className="h-1.5 w-full rounded-full bg-gray-800">
+              <div className="h-1.5 w-full rounded-full bg-zinc-800">
                 <div
                   className={`h-1.5 rounded-full transition-all ${SUBJECT_BAR[subj]}`}
                   style={{ width: `${pct}%` }}
@@ -161,9 +162,8 @@ function SubjectMix({ sessions }: { sessions: SessionRecord[] }) {
   const subjects: Subject[] = ["math", "physics", "chemistry", "other"];
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
       <SectionHeader label="Subject Mix" />
-      {/* Stacked bar */}
       <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full">
         {subjects.map((subj) => {
           const pct = total > 0 ? (counts[subj] / total) * 100 : 0;
@@ -183,7 +183,7 @@ function SubjectMix({ sessions }: { sessions: SessionRecord[] }) {
           return (
             <div key={subj} className="flex items-center gap-2">
               <div className={`h-2.5 w-2.5 rounded-full ${SUBJECT_BAR[subj]}`} />
-              <span className="text-xs text-gray-400">{SUBJECT_LABEL[subj]}</span>
+              <span className="text-xs text-zinc-400">{SUBJECT_LABEL[subj]}</span>
               <span className="ml-auto text-xs tabular-nums font-semibold text-white">{pct}%</span>
             </div>
           );
@@ -201,11 +201,11 @@ function AccuracyRing({ correct, total }: { correct: number; total: number }) {
   const dash = (pct / 100) * circ;
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
       <SectionHeader label="Answer Accuracy" sub="Where is_correct was tracked" />
       <div className="mt-4 flex items-center gap-6">
         <svg width="100" height="100" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="#1f2937" strokeWidth="10" />
+          <circle cx="50" cy="50" r={radius} fill="none" stroke="#27272a" strokeWidth="10" />
           <circle
             cx="50" cy="50" r={radius}
             fill="none"
@@ -222,17 +222,17 @@ function AccuracyRing({ correct, total }: { correct: number; total: number }) {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            <span className="text-xs text-gray-400">Correct</span>
+            <span className="text-xs text-zinc-400">Correct</span>
             <span className="ml-auto pl-4 text-xs tabular-nums text-white">{correct}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-red-500" />
-            <span className="text-xs text-gray-400">Incorrect</span>
+            <span className="text-xs text-zinc-400">Incorrect</span>
             <span className="ml-auto pl-4 text-xs tabular-nums text-white">{total - correct}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-600" />
-            <span className="text-xs text-gray-400">Total</span>
+            <span className="h-2 w-2 rounded-full bg-zinc-600" />
+            <span className="text-xs text-zinc-400">Total</span>
             <span className="ml-auto pl-4 text-xs tabular-nums text-white">{total}</span>
           </div>
         </div>
@@ -247,15 +247,15 @@ function SessionTimeline({ sessions }: { sessions: SessionRecord[] }) {
 
   if (recent.length === 0) {
     return (
-      <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
         <SectionHeader label="Session History" />
-        <p className="mt-4 text-sm text-gray-600">No sessions yet. Start a conversation with Friday!</p>
+        <p className="mt-4 text-sm text-zinc-600">No sessions yet. Start a conversation with Friday!</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
       <SectionHeader label="Session History" badge={`${sessions.length} total`} />
       <div className="mt-5 space-y-3">
         {recent.map((session) => {
@@ -267,28 +267,27 @@ function SessionTimeline({ sessions }: { sessions: SessionRecord[] }) {
             : null;
 
           return (
-            <div key={session.id} className="rounded-xl border border-gray-800 overflow-hidden">
-              {/* Header row */}
+            <div key={session.id} className="rounded-xl border border-zinc-800 overflow-hidden">
               <button
                 onClick={() => setExpanded(isOpen ? null : session.id)}
-                className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-900/60 transition-colors"
+                className="w-full flex items-center gap-3 p-4 text-left hover:bg-zinc-900/60 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-white">
                       {formatDate(session.startTime)}
                     </span>
-                    <span className="text-xs text-gray-500">{formatTime(session.startTime)}</span>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-gray-500">{timeAgo(session.startTime)}</span>
+                    <span className="text-xs text-zinc-500">{formatTime(session.startTime)}</span>
+                    <span className="text-xs text-zinc-600">·</span>
+                    <span className="text-xs text-zinc-500">{timeAgo(session.startTime)}</span>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-400">
+                  <div className="mt-1.5 flex items-center gap-3 text-xs text-zinc-400">
                     <span>{session.questionsCount} questions</span>
-                    <span className="text-gray-700">·</span>
+                    <span className="text-zinc-700">·</span>
                     <span>{formatDuration(session.durationMs)}</span>
                     {correctRate !== null && (
                       <>
-                        <span className="text-gray-700">·</span>
+                        <span className="text-zinc-700">·</span>
                         <span className={correctRate >= 70 ? "text-emerald-400" : correctRate >= 40 ? "text-amber-400" : "text-red-400"}>
                           {correctRate}% accuracy
                         </span>
@@ -306,26 +305,25 @@ function SessionTimeline({ sessions }: { sessions: SessionRecord[] }) {
                     </span>
                   ))}
                   {uniqueTopics.length > 3 && (
-                    <span className="rounded-full border border-gray-700 bg-gray-900 px-2 py-0.5 text-xs text-gray-500">
+                    <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-500">
                       +{uniqueTopics.length - 3}
                     </span>
                   )}
                 </div>
-                <span className="ml-2 text-gray-600 text-xs">{isOpen ? "▲" : "▼"}</span>
+                <span className="ml-2 text-zinc-600 text-xs">{isOpen ? "▲" : "▼"}</span>
               </button>
 
-              {/* Expanded exchanges */}
               {isOpen && (
-                <div className="border-t border-gray-800 divide-y divide-gray-800/60">
+                <div className="border-t border-zinc-800 divide-y divide-zinc-800/60">
                   {session.exchanges.map((ex, i) => (
                     <div key={i} className="px-4 py-3">
                       <div className="flex items-start gap-2 mb-1.5">
-                        <span className="shrink-0 mt-0.5 text-xs font-bold text-purple-400">Q</span>
-                        <p className="text-sm text-gray-200">{ex.question}</p>
+                        <span className="shrink-0 mt-0.5 text-xs font-bold text-indigo-400">Q</span>
+                        <p className="text-sm text-zinc-200">{ex.question}</p>
                       </div>
                       <div className="flex items-start gap-2 mb-1.5">
-                        <span className="shrink-0 mt-0.5 text-xs font-bold text-green-400">A</span>
-                        <p className="text-xs text-gray-400 line-clamp-2">{ex.answer}</p>
+                        <span className="shrink-0 mt-0.5 text-xs font-bold text-emerald-400">A</span>
+                        <p className="text-xs text-zinc-400 line-clamp-2">{ex.answer}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {ex.topic && (
@@ -344,11 +342,11 @@ function SessionTimeline({ sessions }: { sessions: SessionRecord[] }) {
                           </span>
                         )}
                         {ex.toolUsed && (
-                          <span className="rounded-full border border-blue-800 bg-blue-950/50 px-2 py-0.5 text-xs text-blue-400">
+                          <span className="rounded-full border border-indigo-800 bg-indigo-950/50 px-2 py-0.5 text-xs text-indigo-400">
                             {ex.toolUsed.replace(/_/g, " ")}
                           </span>
                         )}
-                        <span className="ml-auto text-xs text-gray-700">{formatTime(ex.timestamp)}</span>
+                        <span className="ml-auto text-xs text-zinc-700">{formatTime(ex.timestamp)}</span>
                       </div>
                     </div>
                   ))}
@@ -392,7 +390,7 @@ function ActivityChart({ sessions }: { sessions: SessionRecord[] }) {
   const max = Math.max(...data.map((d) => d.count), 1);
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
       <SectionHeader label="Activity This Week" sub="Questions asked per day" />
       <div className="mt-5 flex items-end gap-2 h-24">
         {data.map((day) => {
@@ -401,18 +399,18 @@ function ActivityChart({ sessions }: { sessions: SessionRecord[] }) {
             day.date.toDateString() === new Date().toDateString();
           return (
             <div key={day.label} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs tabular-nums text-gray-500">
+              <span className="text-xs tabular-nums text-zinc-500">
                 {day.count > 0 ? day.count : ""}
               </span>
               <div className="w-full flex flex-col justify-end" style={{ height: 88 }}>
                 <div
                   className={`w-full rounded-t-sm transition-all ${
-                    isToday ? "bg-purple-500" : day.count > 0 ? "bg-gray-600" : "bg-gray-800"
+                    isToday ? "bg-indigo-500" : day.count > 0 ? "bg-zinc-600" : "bg-zinc-800"
                   }`}
                   style={{ height: h }}
                 />
               </div>
-              <span className={`text-xs ${isToday ? "text-purple-400 font-semibold" : "text-gray-600"}`}>
+              <span className={`text-xs ${isToday ? "text-indigo-400 font-semibold" : "text-zinc-600"}`}>
                 {day.label}
               </span>
             </div>
@@ -426,11 +424,11 @@ function ActivityChart({ sessions }: { sessions: SessionRecord[] }) {
 function SectionHeader({ label, badge, sub }: { label: string; badge?: string; sub?: string }) {
   return (
     <div className="flex items-center gap-2">
-      <p className="text-xs uppercase tracking-[0.2em] text-gray-500">{label}</p>
+      <p className="text-xs uppercase tracking-widest text-zinc-500">{label}</p>
       {badge && (
-        <span className="rounded-full bg-gray-800 px-2 py-0.5 text-xs text-gray-400">{badge}</span>
+        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">{badge}</span>
       )}
-      {sub && <p className="text-xs text-gray-700 ml-auto">{sub}</p>}
+      {sub && <p className="text-xs text-zinc-700 ml-auto">{sub}</p>}
     </div>
   );
 }
@@ -494,26 +492,29 @@ export default function DashboardPage() {
   }, [sessions]);
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-[#09090b] text-white">
       {/* ── Top bar ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-black/90 backdrop-blur px-6 py-4">
+      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md px-6 py-3.5">
         <div className="mx-auto max-w-6xl flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-purple-400">Parents Dashboard</p>
-            <h1 className="mt-0.5 text-xl font-bold">Friday Tutor</h1>
-          </div>
+          <Link href="/" className="flex items-center gap-2.5">
+            <Image src="/friday-logo.png" alt="Friday logo" width={28} height={28} className="rounded-lg" />
+            <div>
+              <span className="text-sm font-semibold text-white">Friday</span>
+              <span className="ml-2 text-xs font-medium text-zinc-500">Parent Dashboard</span>
+            </div>
+          </Link>
 
           <div className="flex items-center gap-2">
             {/* Tab switcher */}
-            <div className="flex items-center rounded-xl border border-gray-700 bg-gray-900 p-1">
+            <div className="flex items-center rounded-lg border border-zinc-700 bg-zinc-900 p-1">
               {(["analytics", "settings"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors capitalize ${
+                  className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors capitalize ${
                     tab === t
-                      ? "bg-gray-700 text-white"
-                      : "text-gray-500 hover:text-gray-300"
+                      ? "bg-zinc-700 text-white"
+                      : "text-zinc-500 hover:text-zinc-300"
                   }`}
                 >
                   {t}
@@ -522,8 +523,8 @@ export default function DashboardPage() {
             </div>
 
             <Link
-              href="/"
-              className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 hover:border-gray-500 hover:text-white transition-colors whitespace-nowrap"
+              href="/learn"
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white whitespace-nowrap"
             >
               ← Back to Tutor
             </Link>
@@ -540,7 +541,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               <StatCard label="Sessions" value={totalSessions} />
               <StatCard label="Questions Asked" value={totalQuestions} />
-              <StatCard label="Topics Learned" value={totalTopics} accent="text-purple-400" />
+              <StatCard label="Topics Learned" value={totalTopics} accent="text-indigo-400" />
               <StatCard label="Avg / Session" value={avgQuestionsPerSession} sub="questions" />
               <StatCard
                 label="Accuracy"
@@ -550,7 +551,7 @@ export default function DashboardPage() {
                     ? Math.round((totalCorrect / trackedAnswers) * 100) >= 70
                       ? "text-emerald-400"
                       : "text-amber-400"
-                    : "text-gray-500"
+                    : "text-zinc-500"
                 }
               />
               <StatCard label="Day Streak" value={streak > 0 ? streak : "—"} sub={streak > 0 ? "days" : undefined} accent="text-orange-400" />
@@ -570,9 +571,9 @@ export default function DashboardPage() {
               {trackedAnswers > 0 ? (
                 <AccuracyRing correct={totalCorrect} total={trackedAnswers} />
               ) : (
-                <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
                   <SectionHeader label="Answer Accuracy" />
-                  <p className="mt-4 text-sm text-gray-600">
+                  <p className="mt-4 text-sm text-zinc-600">
                     Accuracy tracking kicks in once Friday marks answers as correct or incorrect during practice.
                   </p>
                 </div>
@@ -594,17 +595,17 @@ export default function DashboardPage() {
                     >
                       Yes, clear
                     </button>
-                    <button
-                      onClick={() => setConfirmClear(false)}
-                      className="text-sm text-gray-500 hover:text-gray-300"
-                    >
-                      Cancel
-                    </button>
+                  <button
+                    onClick={() => setConfirmClear(false)}
+                    className="text-sm text-zinc-500 hover:text-zinc-300"
+                  >
+                    Cancel
+                  </button>
                   </div>
                 ) : (
                   <button
                     onClick={() => setConfirmClear(true)}
-                    className="text-xs text-gray-700 hover:text-gray-500 transition-colors"
+                    className="text-xs text-zinc-700 hover:text-zinc-500 transition-colors"
                   >
                     Clear analytics data
                   </button>
@@ -617,25 +618,25 @@ export default function DashboardPage() {
         {/* ── SETTINGS TAB ────────────────────────────────── */}
         {tab === "settings" && (
           <div className="max-w-lg">
-            <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
-              <p className="text-xs uppercase tracking-widest text-purple-400 mb-1">Voice Settings</p>
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+              <p className="text-xs uppercase tracking-widest text-indigo-400 mb-1">Voice Settings</p>
               <h2 className="text-2xl font-bold mb-1">Friday&apos;s Voice</h2>
-              <p className="text-sm text-gray-400 mb-5">
+              <p className="text-sm text-zinc-400 mb-5">
                 Choose how Friday speaks to your child. Changes take effect immediately.
               </p>
 
               {voicesLoading ? (
-                <p className="text-sm text-gray-500">Loading voices…</p>
+                <p className="text-sm text-zinc-500">Loading voices…</p>
               ) : voicesError ? (
                 <p className="text-sm text-red-400">{voicesError}</p>
               ) : (
                 <select
                   value={voiceId}
                   onChange={(e) => handleVoiceChange(e.target.value)}
-                  className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-sm text-white outline-none focus:border-gray-500 cursor-pointer"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500 cursor-pointer"
                 >
                   {voices.map((v) => (
-                    <option key={v.voice_id} value={v.voice_id} className="bg-gray-900">
+                    <option key={v.voice_id} value={v.voice_id} className="bg-zinc-900">
                       {v.name}
                     </option>
                   ))}
@@ -697,10 +698,10 @@ function VoicePreview({ voiceId }: { voiceId: string }) {
     <button
       onClick={handlePreview}
       disabled={loading}
-      className="mt-5 flex items-center gap-2 rounded-xl border border-purple-700 bg-purple-950/40 px-4 py-2 text-sm font-semibold text-purple-300 hover:bg-purple-900/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+      className="mt-5 flex items-center gap-2 rounded-xl border border-indigo-700 bg-indigo-950/40 px-4 py-2 text-sm font-semibold text-indigo-300 hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
     >
       {loading ? (
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
       ) : playing ? (
         `Stop preview`
       ) : (

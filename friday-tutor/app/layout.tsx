@@ -14,8 +14,12 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Friday Tutor",
-  description: "Voice-first AI tutor for IB and A-Level students",
+  title: "Friday — AI Tutor for IB & A-Levels",
+  description: "Voice-first AI tutor for IB and Singapore A-Level students. Ask anything in Maths, Physics, or Chemistry.",
+  icons: {
+    icon: "/friday-logo.png",
+    apple: "/friday-logo.png",
+  },
 };
 
 export default function RootLayout({
