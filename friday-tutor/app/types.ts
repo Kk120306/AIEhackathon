@@ -10,6 +10,7 @@ export type TutorToolCall = {
 
 export type TutorResponse = {
   spoken_answer: string;
+  display_answer?: string;
   tool_call?: TutorToolCall;
   topic?: string;
   is_correct?: boolean;

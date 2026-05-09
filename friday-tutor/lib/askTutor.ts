@@ -14,6 +14,7 @@ export type TutorToolCall = {
 
 export type AskTutorResult = {
   spoken_answer: string;
+  display_answer?: string;
   tool_call?: TutorToolCall;
   topic?: string;
   is_correct?: boolean;
@@ -101,6 +102,7 @@ export async function askTutor({
 
   const rawText = textPart?.text ?? response.text ?? "";
   let spokenAnswer = rawText;
+  let displayAnswer: string | undefined;
   let topic: string | undefined;
   let isCorrect: boolean | undefined;
 
@@ -113,6 +115,7 @@ export async function askTutor({
     const parsed = JSON.parse(jsonCandidate);
     if (parsed && typeof parsed.spoken_answer === "string") {
       spokenAnswer = parsed.spoken_answer;
+      if (typeof parsed.display_answer === "string") displayAnswer = parsed.display_answer;
       if (typeof parsed.topic === "string") topic = parsed.topic;
       if (typeof parsed.is_correct === "boolean") isCorrect = parsed.is_correct;
     }
@@ -146,6 +149,7 @@ export async function askTutor({
 
     return {
       spoken_answer: spokenAnswer,
+      display_answer: displayAnswer,
       tool_call: {
         name: fc.name ?? "",
         args: (fc.args ?? {}) as Record<string, unknown>,
@@ -158,5 +162,5 @@ export async function askTutor({
 
   const followUpQuestions = await generateFollowUpQuestions(ai, message, spokenAnswer);
 
-  return { spoken_answer: spokenAnswer, topic, is_correct: isCorrect, follow_up_questions: followUpQuestions };
+  return { spoken_answer: spokenAnswer, display_answer: displayAnswer, topic, is_correct: isCorrect, follow_up_questions: followUpQuestions };
 }
