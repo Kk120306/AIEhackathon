@@ -234,10 +234,7 @@ export default function Home() {
   }, [isConversationActive, isRecording, startConversation, stopConversation, submitNow]);
 
   const handleTypedSubmit = () => {
-    if (!isConversationActive) {
-      setIsConversationActive(true);
-      isConversationActiveRef.current = true;
-    }
+    // Text input never activates the voice loop — mic stays off
     handleQuestion(question);
   };
 
@@ -325,10 +322,7 @@ export default function Home() {
                   key={index}
                   onClick={() => {
                     setQuestion(demo);
-                    if (!isConversationActive) {
-                      setIsConversationActive(true);
-                      isConversationActiveRef.current = true;
-                    }
+                    // Demo prompts use text path — voice loop stays off
                     askBackend(demo);
                   }}
                   className="rounded-xl border border-gray-700 bg-gray-900 p-3 text-left text-sm text-gray-300 hover:border-green-400 hover:text-white"
