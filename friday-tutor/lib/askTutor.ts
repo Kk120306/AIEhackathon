@@ -77,6 +77,28 @@ export async function askTutor({
 
   if (functionCallPart?.functionCall) {
     const fc = functionCallPart.functionCall;
+
+    // If Gemini returned a tool call but no spoken explanation, build one from
+    // the tool arguments so the student always hears something meaningful.
+    if (!spokenAnswer) {
+      const toolName = fc.name ?? "";
+      const args = (fc.args ?? {}) as Record<string, unknown>;
+      if (toolName === "show_desmos_graph") {
+        const exprs: string[] = Array.isArray(args.expressions)
+          ? (args.expressions as string[])
+          : [];
+        spokenAnswer = exprs.length
+          ? `Here's the graph showing ${exprs.join(" and ")}. Take a look at the visualisation panel.`
+          : "I've opened the graph for you. Take a look at the visualisation panel.";
+      } else if (toolName === "show_molecule_3d") {
+        spokenAnswer = `Here's the 3D molecule for ${args.formula ?? args.name ?? "that compound"}. Take a look at the visualisation panel.`;
+      } else if (toolName === "show_steps_breakdown") {
+        spokenAnswer = "I've laid out the step-by-step solution for you. Take a look at the visualisation panel.";
+      } else {
+        spokenAnswer = "Take a look at the visualisation panel for the explanation.";
+      }
+    }
+
     return {
       spoken_answer: spokenAnswer,
       tool_call: {
