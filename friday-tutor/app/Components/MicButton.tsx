@@ -19,6 +19,7 @@ export default function MicButton({
   status,
   onToggle,
 }: MicButtonProps) {
+  // Only truly block the button during processing; recording is tappable (tap = send)
   const isBusy = status === "transcribing" || status === "thinking";
 
   const label = isBusy
@@ -27,7 +28,7 @@ export default function MicButton({
       : "Thinking…"
     : isConversationActive
     ? isRecording
-      ? "Listening — speak freely"
+      ? "Listening — tap to send"
       : "Friday is responding…"
     : "Start Conversation";
 

@@ -4,9 +4,10 @@ import { useRef, useState, useCallback } from "react";
 import type { AppStatus } from "../page";
 
 // VAD tuning constants
-const SILENCE_THRESHOLD = 12;      // RMS below this (0–255 scale) = silence
-const SILENCE_DURATION_MS = 1600;  // Hold silence this long before auto-stopping
-const MIN_RECORDING_MS = 600;      // Never auto-stop before this much has been recorded
+const SILENCE_THRESHOLD = 30;      // RMS below this (0–255 scale) = silence
+const SILENCE_DURATION_MS = 1500;  // Hold silence this long before auto-stopping
+const MIN_RECORDING_MS = 700;      // Never auto-stop before this much has been recorded
+const MAX_RECORDING_MS = 30_000;   // Hard cap — always submit after this long
 
 interface UseVoiceRecorderOptions {
   setStatus: (status: AppStatus) => void;
@@ -63,6 +64,7 @@ export function useVoiceRecorder({
     return String(payload.transcript ?? "").trim();
   };
 
+  // Hard-stop (abort) — used when ending the conversation entirely
   const stopListening = useCallback(() => {
     abortedRef.current = true;
     isStartingRef.current = false;
@@ -73,6 +75,14 @@ export function useVoiceRecorder({
     setIsRecording(false);
     onAudioLevel?.(0);
   }, [stopVad, onAudioLevel]);
+
+  // Soft-stop — submit whatever has been recorded without aborting the session
+  const submitNow = useCallback(() => {
+    if (recorderRef.current?.state === "recording") {
+      stopVad();
+      recorderRef.current.stop();
+    }
+  }, [stopVad]);
 
   const startListening = useCallback(async () => {
     // Prevent overlapping sessions
@@ -126,6 +136,14 @@ export function useVoiceRecorder({
         onAudioLevel?.(Math.min(rms / 80, 1));
 
         const elapsed = Date.now() - recordingStartedAt;
+
+        // Hard cap — always submit after MAX_RECORDING_MS
+        if (elapsed >= MAX_RECORDING_MS) {
+          stopVad();
+          recorder.stop();
+          return;
+        }
+
         if (elapsed >= MIN_RECORDING_MS) {
           if (rms < SILENCE_THRESHOLD) {
             if (silenceStart === null) silenceStart = Date.now();
@@ -200,5 +218,5 @@ export function useVoiceRecorder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onTranscript, onNoSpeech, setStatus, setError, onAudioLevel, stopVad]);
 
-  return { isRecording, startListening, stopListening };
+  return { isRecording, startListening, stopListening, submitNow };
 }

@@ -192,7 +192,7 @@ export default function Home() {
     [handleQuestion]
   );
 
-  const { isRecording, startListening, stopListening } = useVoiceRecorder({
+  const { isRecording, startListening, stopListening, submitNow } = useVoiceRecorder({
     setStatus,
     setError,
     onTranscript: handleTranscript,
@@ -222,9 +222,16 @@ export default function Home() {
   }, [stopListening]);
 
   const handleToggleConversation = useCallback(() => {
-    if (isConversationActive) stopConversation();
-    else startConversation();
-  }, [isConversationActive, startConversation, stopConversation]);
+    if (!isConversationActive) {
+      startConversation();
+    } else if (isRecording) {
+      // Tap while recording → submit current audio immediately
+      submitNow();
+    } else {
+      // Tap while thinking/speaking → end conversation
+      stopConversation();
+    }
+  }, [isConversationActive, isRecording, startConversation, stopConversation, submitNow]);
 
   const handleTypedSubmit = () => {
     if (!isConversationActive) {
