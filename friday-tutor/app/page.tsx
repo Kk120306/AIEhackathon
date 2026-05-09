@@ -58,12 +58,6 @@ export default function LandingPage() {
           </div>
           <nav className="flex items-center gap-3">
             <Link
-              href="/dashboard"
-              className="rounded-lg px-3.5 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:text-white"
-            >
-              Parent Dashboard
-            </Link>
-            <Link
               href="/learn"
               className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500"
             >
@@ -110,12 +104,6 @@ export default function LandingPage() {
             >
               Start Learning
               <span aria-hidden>→</span>
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-7 py-3.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white"
-            >
-              Parent Dashboard
             </Link>
           </div>
 
@@ -209,9 +197,6 @@ export default function LandingPage() {
           <nav className="flex items-center gap-5 text-xs text-zinc-500">
             <Link href="/learn" className="hover:text-zinc-300 transition-colors">
               Learning Platform
-            </Link>
-            <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">
-              Parent Dashboard
             </Link>
           </nav>
         </div>

@@ -89,12 +89,37 @@ function saveToStorage(data: AnalyticsData) {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+function makeSessionId() {
+  return `session_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function makeSession(id: string): SessionRecord {
+  return {
+    id,
+    startTime: Date.now(),
+    questionsCount: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    topics: [],
+    exchanges: [],
+  };
+}
+
 export function useAnalytics() {
   const [analytics, setAnalytics] = useState<AnalyticsData>(emptyAnalytics);
   const activeSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setAnalytics(loadFromStorage());
+
+    // Keep this hook in sync when other tabs (e.g. /learn while /dashboard is
+    // open) write new analytics data.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY) return;
+      setAnalytics(loadFromStorage());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const persist = useCallback((updater: (prev: AnalyticsData) => AnalyticsData) => {
@@ -106,22 +131,12 @@ export function useAnalytics() {
   }, []);
 
   const startSession = useCallback(() => {
-    const id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = makeSessionId();
     activeSessionIdRef.current = id;
-
-    const newSession: SessionRecord = {
-      id,
-      startTime: Date.now(),
-      questionsCount: 0,
-      correctCount: 0,
-      incorrectCount: 0,
-      topics: [],
-      exchanges: [],
-    };
 
     persist((prev) => ({
       ...prev,
-      sessions: [newSession, ...prev.sessions].slice(0, MAX_SESSIONS),
+      sessions: [makeSession(id), ...prev.sessions].slice(0, MAX_SESSIONS),
     }));
 
     return id;
@@ -129,14 +144,27 @@ export function useAnalytics() {
 
   const recordExchange = useCallback(
     (exchange: Omit<Exchange, "timestamp">) => {
-      const sessionId = activeSessionIdRef.current;
-      if (!sessionId) return;
+      // Defensive: if a question is asked outside an explicit conversation
+      // (e.g. demo button, typed-fallback), spin up a session so analytics are
+      // never silently dropped.
+      let sessionId = activeSessionIdRef.current;
+      const needsNewSession = !sessionId;
+      if (!sessionId) {
+        sessionId = makeSessionId();
+        activeSessionIdRef.current = sessionId;
+      }
 
       const entry: Exchange = { ...exchange, timestamp: Date.now() };
+      const capturedSessionId = sessionId;
 
       persist((prev) => {
-        const sessions = prev.sessions.map((s) => {
-          if (s.id !== sessionId) return s;
+        let sessions = prev.sessions;
+        if (needsNewSession) {
+          sessions = [makeSession(capturedSessionId), ...sessions].slice(0, MAX_SESSIONS);
+        }
+
+        sessions = sessions.map((s) => {
+          if (s.id !== capturedSessionId) return s;
           const topics = exchange.topic && !s.topics.includes(exchange.topic)
             ? [...s.topics, exchange.topic]
             : s.topics;

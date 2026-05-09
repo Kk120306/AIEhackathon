@@ -4,7 +4,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import MicButton from "../Components/MicButton";
 import AnswerPanel from "../Components/AnswerPanel";
 import VisualizationPanel from "../Components/VisualizationPanel";
-import CameraPanel, { type CameraPanelHandle } from "../Components/CameraPanel";
+import CameraPanel, {
+  type CameraPanelHandle,
+  type CapturedImage,
+} from "../Components/CameraPanel";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics } from "../hooks/useAnalytics";
@@ -17,18 +20,8 @@ import Image from "next/image";
 const LISTEN_RESUME_DELAY_MS = 500;
 const SILENCE_RETRY_LIMIT = 2;
 
-const CAMERA_TRIGGERS = [
-  "take a picture", "take a photo", "take a photograph",
-  "look at this", "read this", "show you this",
-  "what is this", "what's this", "what does this say",
-  "can you see", "scan this", "photograph this",
-  "capture this", "analyze this", "analyse this",
-];
-
-function detectCameraTrigger(text: string): boolean {
-  const lower = text.toLowerCase();
-  return CAMERA_TRIGGERS.some((p) => lower.includes(p));
-}
+const DEFAULT_PHOTO_QUESTION =
+  "Please read the question shown in this photo and walk me through the full solution step by step.";
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +38,7 @@ export default function LearnPage() {
   const { voiceId } = useVoicePreference();
   const { startSession, recordExchange, endSession } = useAnalytics();
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const currentAudioUrlRef = useRef<string | null>(null);
 
   const cameraRef = useRef<CameraPanelHandle>(null);
   const isConversationActiveRef = useRef(false);
@@ -58,12 +52,40 @@ export default function LearnPage() {
     isConversationActiveRef.current = isConversationActive;
   }, [isConversationActive]);
 
+  const stopCurrentSpeech = useCallback(() => {
+    currentAudioRef.current?.pause();
+    currentAudioRef.current = null;
+
+    if (currentAudioUrlRef.current) {
+      URL.revokeObjectURL(currentAudioUrlRef.current);
+      currentAudioUrlRef.current = null;
+    }
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
-      currentAudioRef.current?.pause();
-      currentAudioRef.current = null;
+      stopCurrentSpeech();
     };
-  }, []);
+  }, [stopCurrentSpeech]);
+
+  // Make sure analytics always get a session end-time, even if the user closes
+  // the tab, refreshes, or hard-navigates away mid-conversation. Without this
+  // the dashboard shows "—" duration for every interrupted session.
+  useEffect(() => {
+    const flush = () => endSession();
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      // Also flush when this page unmounts (route change to /dashboard, etc.).
+      endSession();
+    };
+  }, [endSession]);
 
   const resumeListening = useCallback(() => {
     if (!isConversationActiveRef.current) return;
@@ -98,8 +120,7 @@ export default function LearnPage() {
 
   const speak = useCallback(
     async (text: string) => {
-      currentAudioRef.current?.pause();
-      currentAudioRef.current = null;
+      stopCurrentSpeech();
 
       try {
         const res = await fetch("/api/speak", {
@@ -117,16 +138,23 @@ export default function LearnPage() {
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         currentAudioRef.current = audio;
+        currentAudioUrlRef.current = url;
 
         audio.onended = () => {
-          URL.revokeObjectURL(url);
-          currentAudioRef.current = null;
+          if (currentAudioUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            currentAudioUrlRef.current = null;
+            currentAudioRef.current = null;
+          }
           if (isConversationActiveRef.current) resumeListening();
           else setStatus("idle");
         };
         audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          currentAudioRef.current = null;
+          if (currentAudioUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            currentAudioUrlRef.current = null;
+            currentAudioRef.current = null;
+          }
           speakFallback(text);
         };
 
@@ -135,18 +163,20 @@ export default function LearnPage() {
         speakFallback(text);
       }
     },
-    [resumeListening, speakFallback]
+    [resumeListening, speakFallback, stopCurrentSpeech]
   );
 
   const askBackend = useCallback(
-    async (q: string, imageBase64?: string) => {
+    async (q: string, image?: CapturedImage | { base64: string; mimeType?: string }) => {
       const message = q.trim();
       if (!message) return;
-      currentAudioRef.current?.pause();
-      currentAudioRef.current = null;
+      stopCurrentSpeech();
       setStatus("thinking");
       setResponse(null);
       setError("");
+
+      const imageBase64 = image?.base64;
+      const imageMimeType = image?.mimeType ?? "image/jpeg";
 
       try {
         const res = await fetch("/api/ask", {
@@ -155,7 +185,7 @@ export default function LearnPage() {
           body: JSON.stringify({
             message,
             conversationHistory,
-            ...(imageBase64 ? { imageBase64, imageMimeType: "image/jpeg" } : {}),
+            ...(imageBase64 ? { imageBase64, imageMimeType } : {}),
           }),
         });
         const payload = await res.json();
@@ -165,6 +195,8 @@ export default function LearnPage() {
         setResponse(nextResponse);
         if (nextResponse.follow_up_questions?.length) {
           setFollowUpQuestions(nextResponse.follow_up_questions);
+        } else if (nextResponse.out_of_scope) {
+          setFollowUpQuestions([]);
         }
         setConversationHistory((h) => [
           ...h,
@@ -172,13 +204,17 @@ export default function LearnPage() {
           { role: "assistant", content: nextResponse.spoken_answer },
         ]);
 
-        recordExchange({
-          question: message,
-          answer: nextResponse.spoken_answer,
-          topic: nextResponse.topic,
-          is_correct: nextResponse.is_correct,
-          toolUsed: nextResponse.tool_call?.name,
-        });
+        // Out-of-scope refusals shouldn't pollute the parent dashboard's
+        // topic coverage or progress stats — they aren't real learning.
+        if (!nextResponse.out_of_scope) {
+          recordExchange({
+            question: message,
+            answer: nextResponse.spoken_answer,
+            topic: nextResponse.topic,
+            is_correct: nextResponse.is_correct,
+            toolUsed: nextResponse.tool_call?.name,
+          });
+        }
 
         if (nextResponse.spoken_answer) {
           setStatus("speaking");
@@ -195,19 +231,25 @@ export default function LearnPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [conversationHistory, speak, resumeListening, recordExchange]
+    [conversationHistory, speak, resumeListening, recordExchange, stopCurrentSpeech]
   );
 
   const handleQuestion = useCallback(
     async (q: string) => {
-      let imageBase64: string | undefined;
-      if (detectCameraTrigger(q)) {
-        const dataUrl = cameraRef.current?.captureFrame() ?? null;
-        if (dataUrl) imageBase64 = dataUrl.split(",")[1];
-      }
-      await askBackend(q, imageBase64);
+      // Only attach a photo if the student explicitly captured one ("Take photo").
+      // No photo → text-only question, like a normal chat.
+      const image: CapturedImage | null = cameraRef.current?.takeArmedImage() ?? null;
+      await askBackend(q, image ?? undefined);
     },
     [askBackend]
+  );
+
+  const handleSendCapture = useCallback(
+    (image: CapturedImage) => {
+      const message = question.trim() || DEFAULT_PHOTO_QUESTION;
+      askBackend(message, image);
+    },
+    [question, askBackend]
   );
 
   const handleNoSpeech = useCallback(() => {
@@ -261,13 +303,21 @@ export default function LearnPage() {
     setIsConversationActive(false);
     isConversationActiveRef.current = false;
     stopListening();
-    currentAudioRef.current?.pause();
-    currentAudioRef.current = null;
-    window.speechSynthesis?.cancel();
+    stopCurrentSpeech();
     setStatus("idle");
     setAudioLevel(0);
     endSession();
-  }, [stopListening, endSession]);
+  }, [stopListening, stopCurrentSpeech, endSession]);
+
+  const stopTalking = useCallback(() => {
+    stopCurrentSpeech();
+    setAudioLevel(0);
+    setStatus("idle");
+
+    if (isConversationActiveRef.current) {
+      resumeListening();
+    }
+  }, [resumeListening, stopCurrentSpeech]);
 
   const handleToggleConversation = useCallback(() => {
     if (!isConversationActive) {
@@ -335,7 +385,7 @@ export default function LearnPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* LEFT PANEL */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-            <CameraPanel ref={cameraRef} />
+            <CameraPanel ref={cameraRef} onSendCapture={handleSendCapture} />
 
             <MicButton
               isConversationActive={isConversationActive}
@@ -352,6 +402,17 @@ export default function LearnPage() {
             >
               {statusLabel[status]}
             </p>
+
+            {status === "speaking" && (
+              <button
+                type="button"
+                onClick={stopTalking}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-700/70 bg-red-950/50 px-4 py-2 text-sm font-semibold text-red-100 transition-colors hover:border-red-500 hover:bg-red-900/60"
+              >
+                <span aria-hidden="true">■</span>
+                Stop talking
+              </button>
+            )}
 
             {error && (
               <div className="mt-3 rounded-xl border border-red-800/60 bg-red-950/40 p-3 text-sm text-red-300">

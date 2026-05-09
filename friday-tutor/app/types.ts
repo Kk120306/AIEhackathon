@@ -14,6 +14,7 @@ export type TutorResponse = {
   tool_call?: TutorToolCall;
   topic?: string;
   is_correct?: boolean;
+  out_of_scope?: boolean;
   follow_up_questions?: string[];
 };
 

@@ -18,6 +18,7 @@ export type AskTutorResult = {
   tool_call?: TutorToolCall;
   topic?: string;
   is_correct?: boolean;
+  out_of_scope?: boolean;
   follow_up_questions?: string[];
 };
 
@@ -90,8 +91,20 @@ export async function askTutor({
     },
   });
 
+  if (imageBase64) {
+    // Helpful when debugging "Friday isn't seeing the question" — confirms the
+    // frame actually reaches the model and roughly how big it is.
+    const sizeKb = Math.round((imageBase64.length * 3) / 4 / 1024);
+    console.log(`[askTutor] image attached: ~${sizeKb}KB ${imageMimeType}`);
+  }
+
   const messageParts = imageBase64
-    ? [{ inlineData: { mimeType: imageMimeType, data: imageBase64 } }, { text: message }]
+    ? [
+        // Image FIRST so the model reads the visual context before the spoken
+        // request — this materially improves Gemini's willingness to use it.
+        { inlineData: { mimeType: imageMimeType, data: imageBase64 } },
+        { text: message },
+      ]
     : message;
 
   const response = await chat.sendMessage({ message: messageParts });
@@ -105,30 +118,47 @@ export async function askTutor({
   let displayAnswer: string | undefined;
   let topic: string | undefined;
   let isCorrect: boolean | undefined;
+  let outOfScope: boolean | undefined;
 
-  // Try to extract structured fields if model happened to return JSON
-  const jsonCandidate = rawText
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/, "")
-    .trim();
-  try {
-    const parsed = JSON.parse(jsonCandidate);
-    if (parsed && typeof parsed.spoken_answer === "string") {
-      spokenAnswer = parsed.spoken_answer;
-      if (typeof parsed.display_answer === "string") displayAnswer = parsed.display_answer;
-      if (typeof parsed.topic === "string") topic = parsed.topic;
-      if (typeof parsed.is_correct === "boolean") isCorrect = parsed.is_correct;
+  // Try to extract structured fields if model happened to return JSON.
+  const jsonCandidate = extractJsonObject(rawText);
+  if (jsonCandidate) {
+    try {
+      const parsed = JSON.parse(jsonCandidate);
+      if (parsed && typeof parsed.spoken_answer === "string") {
+        spokenAnswer = parsed.spoken_answer;
+        if (typeof parsed.display_answer === "string") displayAnswer = parsed.display_answer;
+        if (typeof parsed.topic === "string" && parsed.topic.trim()) topic = parsed.topic.trim();
+        if (typeof parsed.is_correct === "boolean") isCorrect = parsed.is_correct;
+        if (typeof parsed.out_of_scope === "boolean") outOfScope = parsed.out_of_scope;
+      }
+    } catch {
+      // Not valid JSON — keep raw text as-is and fall through to regex fallbacks below.
     }
-  } catch {
-    // Not JSON — use raw text as-is
   }
 
-  if (functionCallPart?.functionCall) {
+  // Regex fallbacks for when the model emits malformed JSON (or mixes JSON
+  // with prose). These keep analytics rich even when parsing fails.
+  if (!topic) {
+    const topicMatch = rawText.match(/"topic"\s*:\s*"([^"]+)"/);
+    if (topicMatch) topic = topicMatch[1].trim();
+  }
+  if (isCorrect === undefined) {
+    const correctMatch = rawText.match(/"is_correct"\s*:\s*(true|false)/);
+    if (correctMatch) isCorrect = correctMatch[1] === "true";
+  }
+  if (outOfScope === undefined) {
+    const oosMatch = rawText.match(/"out_of_scope"\s*:\s*(true|false)/);
+    if (oosMatch) outOfScope = oosMatch[1] === "true";
+  }
+
+  // Skip tool calls when the model flagged the question as out of scope.
+  if (functionCallPart?.functionCall && !outOfScope) {
     const fc = functionCallPart.functionCall;
+    const toolName = fc.name ?? "";
+    const args = (fc.args ?? {}) as Record<string, unknown>;
 
     if (!spokenAnswer) {
-      const toolName = fc.name ?? "";
-      const args = (fc.args ?? {}) as Record<string, unknown>;
       if (toolName === "show_desmos_graph") {
         const exprs: string[] = Array.isArray(args.expressions)
           ? (args.expressions as string[])
@@ -137,7 +167,7 @@ export async function askTutor({
           ? `Here's the graph showing ${exprs.join(" and ")}. Take a look at the visualisation panel.`
           : "I've opened the graph for you. Take a look at the visualisation panel.";
       } else if (toolName === "show_molecule_3d") {
-        spokenAnswer = `Here's the 3D molecule for ${args.formula ?? args.name ?? "that compound"}. Take a look at the visualisation panel.`;
+        spokenAnswer = `Here's the 3D molecule for ${args.molecule_name ?? args.formula ?? args.name ?? "that compound"}. Take a look at the visualisation panel.`;
       } else if (toolName === "show_steps_breakdown") {
         spokenAnswer = "I've laid out the step-by-step solution for you. Take a look at the visualisation panel.";
       } else {
@@ -145,22 +175,83 @@ export async function askTutor({
       }
     }
 
+    // Last-ditch topic fallback derived from the tool call itself, so the
+    // dashboard never shows "no topic" for a visualisation answer.
+    if (!topic) {
+      topic = topicFromToolCall(toolName, args);
+    }
+
     const followUpQuestions = await generateFollowUpQuestions(ai, message, spokenAnswer);
 
     return {
       spoken_answer: spokenAnswer,
       display_answer: displayAnswer,
-      tool_call: {
-        name: fc.name ?? "",
-        args: (fc.args ?? {}) as Record<string, unknown>,
-      },
+      tool_call: { name: toolName, args },
       topic,
       is_correct: isCorrect,
+      out_of_scope: outOfScope,
       follow_up_questions: followUpQuestions,
     };
   }
 
-  const followUpQuestions = await generateFollowUpQuestions(ai, message, spokenAnswer);
+  // For out-of-scope answers, skip follow-up generation — we don't want the
+  // student nudged back into an off-syllabus thread.
+  const followUpQuestions = outOfScope
+    ? []
+    : await generateFollowUpQuestions(ai, message, spokenAnswer);
 
-  return { spoken_answer: spokenAnswer, display_answer: displayAnswer, topic, is_correct: isCorrect, follow_up_questions: followUpQuestions };
+  return {
+    spoken_answer: spokenAnswer,
+    display_answer: displayAnswer,
+    topic,
+    is_correct: isCorrect,
+    out_of_scope: outOfScope,
+    follow_up_questions: followUpQuestions,
+  };
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Pulls the first balanced top-level JSON object out of `raw`, tolerating code
+ * fences and surrounding prose. Returns null if no candidate is found.
+ */
+function extractJsonObject(raw: string): string | null {
+  if (!raw) return null;
+  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  if (stripped.startsWith("{") && stripped.endsWith("}")) return stripped;
+
+  const start = stripped.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < stripped.length; i++) {
+    const ch = stripped[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return stripped.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function topicFromToolCall(toolName: string, args: Record<string, unknown>): string | undefined {
+  if (toolName === "show_steps_breakdown" && typeof args.topic === "string" && args.topic.trim()) {
+    return args.topic.trim();
+  }
+  if (toolName === "show_molecule_3d") {
+    const name = (args.molecule_name ?? args.name) as string | undefined;
+    if (typeof name === "string" && name.trim()) return name.trim();
+    return "Molecular Structure";
+  }
+  if (toolName === "show_desmos_graph") {
+    return "Graphing";
+  }
+  return undefined;
 }

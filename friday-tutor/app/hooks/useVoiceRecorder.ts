@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import type { AppStatus } from "../page";
+import type { AppStatus } from "../types";
 
 // VAD tuning constants
 const SILENCE_THRESHOLD = 30;      // RMS below this (0–255 scale) = silence
