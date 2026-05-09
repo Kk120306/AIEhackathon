@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.0.1",
     "@types/katex": "^0.16.8",
     "katex": "^0.16.45",
     "next": "14.2.35",
