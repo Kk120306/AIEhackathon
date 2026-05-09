@@ -26,7 +26,7 @@ export async function askTutor({
 }): Promise<AskTutorResult> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.0-flash",
+    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations: tools }],
   });
