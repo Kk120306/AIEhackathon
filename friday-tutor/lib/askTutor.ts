@@ -22,36 +22,44 @@ export type AskTutorResult = {
 export async function askTutor({
   message,
   conversationHistory = [],
+  imageBase64,
+  imageMimeType = "image/jpeg",
 }: {
   message: string;
   conversationHistory?: ConversationMessage[];
+  imageBase64?: string;
+  imageMimeType?: string;
 }): Promise<AskTutorResult> {
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{ functionDeclarations: tools }],
-  });
+  const ai = getGeminiClient();
 
-  // Gemini history uses "user" / "model" roles; system messages are handled
-  // via systemInstruction above and must be excluded from history.
+  // @google/genai uses "user" / "model" roles; system messages go in systemInstruction
   const history = conversationHistory
     .filter((m) => m.role !== "system")
     .map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
+      role: m.role === "assistant" ? "model" : ("user" as const),
       parts: [{ text: m.content }],
     }));
 
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessage(message);
-  const response = result.response;
+  const chat = ai.chats.create({
+    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.5-flash-lite",
+    history,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      tools: [{ functionDeclarations: tools }],
+    },
+  });
+
+  const messageParts = imageBase64
+    ? [{ inlineData: { mimeType: imageMimeType, data: imageBase64 } }, { text: message }]
+    : message;
+
+  const response = await chat.sendMessage({ message: messageParts });
 
   const parts = response.candidates?.[0]?.content?.parts ?? [];
   const functionCallPart = parts.find((p) => p.functionCall);
   const textPart = parts.find((p) => p.text);
 
-  // Try to parse the text part as JSON to extract topic / is_correct
-  const rawText = textPart?.text ?? response.text();
+  const rawText = textPart?.text ?? response.text ?? "";
   let spokenAnswer = rawText;
   let topic: string | undefined;
   let isCorrect: boolean | undefined;
@@ -64,7 +72,7 @@ export async function askTutor({
       if (typeof parsed.is_correct === "boolean") isCorrect = parsed.is_correct;
     }
   } catch {
-    // Not JSON — use raw text as spoken_answer, no topic/is_correct
+    // Not JSON — use raw text as-is
   }
 
   if (functionCallPart?.functionCall) {
@@ -72,7 +80,7 @@ export async function askTutor({
     return {
       spoken_answer: spokenAnswer,
       tool_call: {
-        name: fc.name,
+        name: fc.name ?? "",
         args: (fc.args ?? {}) as Record<string, unknown>,
       },
       topic,
@@ -80,9 +88,5 @@ export async function askTutor({
     };
   }
 
-  return {
-    spoken_answer: spokenAnswer,
-    topic,
-    is_correct: isCorrect,
-  };
+  return { spoken_answer: spokenAnswer, topic, is_correct: isCorrect };
 }

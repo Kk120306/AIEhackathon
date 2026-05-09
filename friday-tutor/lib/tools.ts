@@ -1,5 +1,5 @@
-import type { FunctionDeclaration } from "@google/generative-ai";
-import { SchemaType } from "@google/generative-ai";
+import type { FunctionDeclaration } from "@google/genai";
+import { Type as SchemaType } from "@google/genai";
 
 export const tools: FunctionDeclaration[] = [
   {
