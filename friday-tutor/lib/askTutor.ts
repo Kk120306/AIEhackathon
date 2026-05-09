@@ -41,7 +41,7 @@ export async function askTutor({
     }));
 
   const chat = ai.chats.create({
-    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.0-flash",
+    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.5-flash-lite",
     history,
     config: {
       systemInstruction: SYSTEM_PROMPT,

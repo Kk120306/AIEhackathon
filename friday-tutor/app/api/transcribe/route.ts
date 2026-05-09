@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     const ai = getGeminiClient();
     const response = await ai.models.generateContent({
-      model: process.env.GEMINI_TRANSCRIPTION_MODEL ?? "gemini-2.5-flash",
+      model: process.env.GEMINI_TRANSCRIPTION_MODEL ?? "gemini-2.5-flash-lite",
       contents: [
         {
           role: "user",
