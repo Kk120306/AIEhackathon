@@ -4,6 +4,8 @@ import { askTutor, type ConversationMessage } from "@/lib/askTutor";
 type AskRequestBody = {
   message?: unknown;
   conversationHistory?: unknown;
+  imageBase64?: unknown;
+  imageMimeType?: unknown;
 };
 
 function isConversationMessage(value: unknown): value is ConversationMessage {
@@ -65,7 +67,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await askTutor({ message, conversationHistory });
+    const imageBase64 =
+      typeof body.imageBase64 === "string" && body.imageBase64.length > 0
+        ? body.imageBase64
+        : undefined;
+
+    const imageMimeType =
+      typeof body.imageMimeType === "string" && body.imageMimeType.length > 0
+        ? body.imageMimeType
+        : "image/jpeg";
+
+    const result = await askTutor({ message, conversationHistory, imageBase64, imageMimeType });
 
     return NextResponse.json(result);
   } catch (error) {
