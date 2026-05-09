@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import MicButton from "./Components/MicButton";
 import AnswerPanel from "./Components/AnswerPanel";
 import VisualizationPanel from "./Components/VisualizationPanel";
@@ -62,6 +64,7 @@ export default function Home() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [isConversationActive, setIsConversationActive] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const cameraRef = useRef<CameraPanelHandle>(null);
   // Refs to avoid stale closures in async callbacks
@@ -69,9 +72,23 @@ export default function Home() {
   const silenceRetriesRef = useRef(0);
   const startListeningRef = useRef<() => void>(() => {});
 
+  const startSessionMutation   = useMutation(api.sessions.startSession);
+  const endSessionMutation     = useMutation(api.sessions.endSession);
+  const saveMessageMutation    = useMutation(api.sessions.saveMessage);
+  const addTopicMutation       = useMutation(api.sessions.addTopicToSession);
+  const upsertProgressMutation = useMutation(api.sessions.upsertProgress);
+
   useEffect(() => {
     isConversationActiveRef.current = isConversationActive;
   }, [isConversationActive]);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      if (sessionId) endSessionMutation({ sessionId });
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, [sessionId, endSessionMutation]);
 
   useEffect(() => {
     return () => { window.speechSynthesis?.cancel(); };
@@ -129,6 +146,41 @@ export default function Home() {
         if (!res.ok) throw new Error(payload.error ?? "Friday could not answer that yet.");
 
         const nextResponse = payload as TutorResponse;
+
+        // Session lifecycle & Convex persistence
+        let currentSessionId = sessionId;
+        if (!currentSessionId) {
+          currentSessionId = await startSessionMutation({ studentName: "Student" });
+          setSessionId(currentSessionId);
+        }
+
+        await saveMessageMutation({
+          sessionId: currentSessionId,
+          role: "user",
+          content: message,
+        });
+        await saveMessageMutation({
+          sessionId: currentSessionId,
+          role: "assistant",
+          content: nextResponse.spoken_answer,
+          topicTag: nextResponse.topic,
+        });
+
+        if (nextResponse.topic) {
+          await addTopicMutation({
+            sessionId: currentSessionId,
+            topic: nextResponse.topic,
+          });
+        }
+
+        if (nextResponse.topic && nextResponse.is_correct !== undefined) {
+          await upsertProgressMutation({
+            sessionId: currentSessionId,
+            topic: nextResponse.topic,
+            isCorrect: nextResponse.is_correct,
+          });
+        }
+
         setResponse(nextResponse);
         setConversationHistory((h) => [
           ...h,
@@ -151,7 +203,7 @@ export default function Home() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [conversationHistory, speak, resumeListening]
+    [conversationHistory, speak, resumeListening, sessionId, startSessionMutation, saveMessageMutation, addTopicMutation, upsertProgressMutation]
   );
 
   const handleQuestion = useCallback(
@@ -255,6 +307,11 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white p-6">
+      <div className="mb-4 flex justify-end">
+        <a href="/dashboard" className="text-xs text-gray-500 hover:text-gray-300 underline">
+          Parent Dashboard →
+        </a>
+      </div>
       <section className="mb-8">
         <p className="text-sm uppercase tracking-[0.3em] text-green-400">Friday Tutor</p>
         <h1 className="mt-2 text-4xl font-bold">
