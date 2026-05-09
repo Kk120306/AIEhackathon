@@ -197,7 +197,7 @@ export default function LearnPage() {
   const [teacherPortraitFailed, setTeacherPortraitFailed] = useState(false);
   const [teacherCharacterBrief, setTeacherCharacterBrief] = useState("");
 
-  const { voiceId } = useVoicePreference();
+  const { voiceId, setVoiceId } = useVoicePreference();
   const { startSession, recordExchange, endSession } = useAnalytics();
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
@@ -883,6 +883,8 @@ export default function LearnPage() {
               characterBrief={teacherCharacterBrief}
               onCharacterBriefChange={setTeacherCharacterBrief}
               onApplyCharacter={handleApplyTeacherCharacter}
+              voiceId={voiceId}
+              setVoiceId={setVoiceId}
             />
 
             <div className="mb-4 mt-5">

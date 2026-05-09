@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type { AppStatus } from "../types";
+import VoicePicker from "./VoicePicker";
 
 /** Keep in sync with TEACHER_CHARACTER_BRIEF_MAX in lib/teacherPortrait.ts */
 export const TEACHER_CHARACTER_INPUT_MAX = 280;
@@ -178,6 +179,8 @@ export default function TeacherPresence({
   characterBrief,
   onCharacterBriefChange,
   onApplyCharacter,
+  voiceId,
+  setVoiceId,
 }: {
   status: AppStatus;
   audioLevel: number;
@@ -187,6 +190,8 @@ export default function TeacherPresence({
   characterBrief: string;
   onCharacterBriefChange: (value: string) => void;
   onApplyCharacter: () => void;
+  voiceId: string;
+  setVoiceId: (id: string) => void;
 }) {
   const speaking = status === "speaking";
   const thinking = status === "thinking" || status === "transcribing";
@@ -291,39 +296,46 @@ export default function TeacherPresence({
 
       <details className="group relative mt-2 border-t border-zinc-800/70 pt-0">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-2 text-[11px] font-semibold text-zinc-500 hover:text-zinc-300 [&::-webkit-details-marker]:hidden">
-          <span>Customize portrait</span>
+          <span>Customize tutor</span>
           <span aria-hidden className="text-[10px] text-zinc-600 transition-transform group-open:rotate-180">
             ▼
           </span>
         </summary>
-        <div className="pb-1 pt-0.5">
-          <label htmlFor="teacher-character-brief" className="sr-only">
-            Tutor look (optional)
-          </label>
-          <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
-            Optional description — Imagen runs only when you tap generate.
-          </p>
-          <textarea
-            id="teacher-character-brief"
-            value={characterBrief}
-            onChange={(e) =>
-              onCharacterBriefChange(e.target.value.slice(0, TEACHER_CHARACTER_INPUT_MAX))
-            }
-            rows={2}
-            disabled={portraitLoading}
-            placeholder='e.g. friendly woman in her 40s, navy cardigan'
-            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-950/80 px-2.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[10px] tabular-nums text-zinc-600">{len}/{TEACHER_CHARACTER_INPUT_MAX}</span>
-            <button
-              type="button"
-              onClick={onApplyCharacter}
+        <div className="space-y-4 pb-1 pt-0.5">
+          <VoicePicker voiceId={voiceId} setVoiceId={setVoiceId} />
+
+          <div className="border-t border-zinc-800/60 pt-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Portrait
+            </p>
+            <label htmlFor="teacher-character-brief" className="sr-only">
+              Tutor look (optional)
+            </label>
+            <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
+              Optional look — Imagen runs only when you tap generate.
+            </p>
+            <textarea
+              id="teacher-character-brief"
+              value={characterBrief}
+              onChange={(e) =>
+                onCharacterBriefChange(e.target.value.slice(0, TEACHER_CHARACTER_INPUT_MAX))
+              }
+              rows={2}
               disabled={portraitLoading}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {portraitLoading ? "Generating…" : "Generate"}
-            </button>
+              placeholder='e.g. friendly woman in her 40s, navy cardigan'
+              className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-950/80 px-2.5 py-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[10px] tabular-nums text-zinc-600">{len}/{TEACHER_CHARACTER_INPUT_MAX}</span>
+              <button
+                type="button"
+                onClick={onApplyCharacter}
+                disabled={portraitLoading}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {portraitLoading ? "Generating…" : "Generate portrait"}
+              </button>
+            </div>
           </div>
         </div>
       </details>

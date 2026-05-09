@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useVoicePreference } from "../hooks/useVoicePreference";
 import { useAnalytics, type SessionRecord, type Subject } from "../hooks/useAnalytics";
-
-type ElevenLabsVoice = { voice_id: string; name: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -551,31 +548,9 @@ function ParentalControlsComingSoon() {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { voiceId, setVoiceId } = useVoicePreference();
   const { analytics, clearAnalytics } = useAnalytics();
-  const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);
-  const [voicesLoading, setVoicesLoading] = useState(true);
-  const [voicesError, setVoicesError] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
-  const [tab, setTab] = useState<"analytics" | "settings">("analytics");
   const [confirmClear, setConfirmClear] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/voices")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setVoices(data);
-        else setVoicesError("Could not load voices.");
-      })
-      .catch(() => setVoicesError("Could not load voices."))
-      .finally(() => setVoicesLoading(false));
-  }, []);
-
-  const handleVoiceChange = (id: string) => {
-    setVoiceId(id);
-    setSaveStatus("saved");
-    setTimeout(() => setSaveStatus("idle"), 2000);
-  };
+  const [tab, setTab] = useState<"analytics" | "settings">("analytics");
 
   const { sessions, totalQuestions, totalCorrect, totalIncorrect } = analytics;
   const totalSessions = sessions.length;
@@ -734,102 +709,22 @@ export default function DashboardPage() {
 
         {/* ── SETTINGS TAB ────────────────────────────────── */}
         {tab === "settings" && (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,22rem)_1fr] lg:items-start xl:grid-cols-[minmax(0,26rem)_1fr] xl:gap-10">
-            <section className="min-w-0 lg:sticky lg:top-20">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-                <p className="mb-1 text-xs uppercase tracking-widest text-indigo-400">Voice Settings</p>
-                <h2 className="mb-1 text-xl font-bold sm:text-2xl">ACE&apos;s Voice</h2>
-                <p className="mb-5 text-sm text-zinc-400">
-                  Choose how ACE speaks to your child. Changes take effect immediately.
-                </p>
-
-                {voicesLoading ? (
-                  <p className="text-sm text-zinc-500">Loading voices…</p>
-                ) : voicesError ? (
-                  <p className="text-sm text-red-400">{voicesError}</p>
-                ) : (
-                  <select
-                    value={voiceId}
-                    onChange={(e) => handleVoiceChange(e.target.value)}
-                    className="w-full max-w-full cursor-pointer rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
-                  >
-                    {voices.map((v) => (
-                      <option key={v.voice_id} value={v.voice_id} className="bg-zinc-900">
-                        {v.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {saveStatus === "saved" && (
-                  <p className="mt-3 text-xs text-green-400">Voice preference saved.</p>
-                )}
-
-                <VoicePreview voiceId={voiceId} />
-              </div>
-            </section>
-
-            <section className="min-w-0">
-              <ParentalControlsComingSoon />
-            </section>
+          <div className="max-w-2xl space-y-6">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+              <p className="mb-1 text-xs uppercase tracking-widest text-indigo-400">Tutor appearance & voice</p>
+              <h2 className="mb-2 text-xl font-bold">Configure on the Learn page</h2>
+              <p className="text-sm text-zinc-400">
+                Speaking voice, portrait preview, and custom tutor looks are set in the session sidebar on{" "}
+                <Link href="/learn" className="font-medium text-indigo-400 underline-offset-2 hover:underline">
+                  Learn
+                </Link>
+                . Open <span className="text-zinc-300">Customize tutor</span> next to ACE&apos;s card.
+              </p>
+            </div>
+            <ParentalControlsComingSoon />
           </div>
         )}
       </div>
     </main>
-  );
-}
-
-// ── Voice preview ─────────────────────────────────────────────────────────────
-
-function VoicePreview({ voiceId }: { voiceId: string }) {
-  const [loading, setLoading] = useState(false);
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-
-  const handlePreview = async () => {
-    if (playing) {
-      audio?.pause();
-      setPlaying(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: "Hi! I'm ACE, your AI tutor. I'm here to help you ace your exams.",
-          voiceId,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = new Audio(url);
-      setAudio(a);
-      setPlaying(true);
-      a.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
-      a.play();
-    } catch {
-      // preview failed silently
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <button
-      onClick={handlePreview}
-      disabled={loading}
-      className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-700 bg-indigo-950/40 px-4 py-2.5 text-sm font-semibold text-indigo-300 hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors sm:w-auto sm:justify-start"
-    >
-      {loading ? (
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
-      ) : playing ? (
-        `Stop preview`
-      ) : (
-        `Preview voice`
-      )}
-    </button>
   );
 }
