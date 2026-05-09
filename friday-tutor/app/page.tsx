@@ -1,14 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import MicButton from "./components/MicButton";
 import AnswerPanel from "./components/AnswerPanel";
 import VisualizationPanel from "./components/VisualizationPanel";
+import CameraPanel, { type CameraPanelHandle } from "./Components/CameraPanel";
+
+const CAMERA_TRIGGERS = [
+  "take a picture",
+  "take a photo",
+  "take a photograph",
+  "look at this",
+  "read this",
+  "show you this",
+  "what is this",
+  "what's this",
+  "what does this say",
+  "can you see",
+  "scan this",
+  "photograph this",
+  "capture this",
+  "analyze this",
+  "analyse this",
+];
+
+function detectCameraTrigger(text: string): boolean {
+  const lower = text.toLowerCase();
+  return CAMERA_TRIGGERS.some((p) => lower.includes(p));
+}
 
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState<any>(null);
   const [status, setStatus] = useState("idle");
+  const cameraRef = useRef<CameraPanelHandle>(null);
 
   const speak = (text: string) => {
     if (!text) return;
@@ -27,41 +52,42 @@ export default function Home() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const askBackend = async (q: string) => {
+  const askBackend = async (q: string, imageBase64?: string) => {
     if (!q.trim()) return;
 
     setStatus("thinking");
     setResponse(null);
 
-    // TEMPORARY MOCK RESPONSE
-    // Use this until Kai's backend is ready.
-    const mockResponse = {
-      subject: "Mathematics",
-      topic: "Graph Transformation",
-      spoken_answer:
-        "Of course. Start with y equals x squared. The expression x minus 3 shifts the graph 3 units to the right. The coefficient 2 stretches the graph vertically, making it narrower. Finally, the plus 1 shifts the graph 1 unit upward.",
-      needs_visualization: true,
-      visualization_tool: "desmos",
-      visualization_url: "https://www.desmos.com/calculator",
-      display_steps: [
-        "Start with the base graph: y = x².",
-        "Replace x with (x - 3), which shifts the graph 3 units to the right.",
-        "Multiply the function by 2, which stretches the graph vertically.",
-        "Add 1 outside the bracket, which shifts the graph 1 unit upward.",
-      ],
-      exam_tip:
-        "For graph transformations, identify horizontal shifts inside the bracket first, then vertical stretches and vertical translations.",
-    };
-
-    setTimeout(() => {
-      setResponse(mockResponse);
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: q.trim(),
+          ...(imageBase64 ? { imageBase64, imageMimeType: "image/jpeg" } : {}),
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Friday could not answer.");
+      setResponse(payload);
       setStatus("speaking");
-      speak(mockResponse.spoken_answer);
-    }, 1000);
+      speak(payload.spoken_answer ?? "");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const handleQuestion = async (q: string) => {
+    let imageBase64: string | undefined;
+    if (detectCameraTrigger(q)) {
+      const dataUrl = cameraRef.current?.captureFrame() ?? null;
+      if (dataUrl) imageBase64 = dataUrl.split(",")[1];
+    }
+    await askBackend(q, imageBase64);
   };
 
   const handleTypedSubmit = () => {
-    askBackend(question);
+    handleQuestion(question);
   };
 
   const demoQuestions = [
@@ -90,10 +116,12 @@ export default function Home() {
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* LEFT PANEL */}
         <div className="rounded-2xl border border-gray-800 bg-gray-950 p-6">
+          <CameraPanel ref={cameraRef} />
+
           <div className="flex items-center gap-4">
             <MicButton
               setQuestion={setQuestion}
-              askBackend={askBackend}
+              askBackend={handleQuestion}
               setStatus={setStatus}
             />
 
@@ -140,7 +168,7 @@ export default function Home() {
                   key={index}
                   onClick={() => {
                     setQuestion(demo);
-                    askBackend(demo);
+                    handleQuestion(demo);
                   }}
                   className="rounded-xl border border-gray-700 bg-gray-900 p-3 text-left text-sm text-gray-300 hover:border-green-400 hover:text-white"
                 >
