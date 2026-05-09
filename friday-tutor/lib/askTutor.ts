@@ -1,3 +1,4 @@
+import { type Part } from "@google/generative-ai";
 import { getGeminiClient } from "@/lib/gemini";
 import { SYSTEM_PROMPT } from "@/lib/prompts";
 import { tools } from "@/lib/tools";
@@ -20,9 +21,13 @@ export type AskTutorResult = {
 export async function askTutor({
   message,
   conversationHistory = [],
+  imageBase64,
+  imageMimeType = "image/jpeg",
 }: {
   message: string;
   conversationHistory?: ConversationMessage[];
+  imageBase64?: string;
+  imageMimeType?: string;
 }): Promise<AskTutorResult> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
@@ -41,7 +46,12 @@ export async function askTutor({
     }));
 
   const chat = model.startChat({ history });
-  const result = await chat.sendMessage(message);
+
+  const messageParts: string | Part[] = imageBase64
+    ? [{ inlineData: { mimeType: imageMimeType, data: imageBase64 } }, { text: message }]
+    : message;
+
+  const result = await chat.sendMessage(messageParts);
   const response = result.response;
 
   const parts = response.candidates?.[0]?.content?.parts ?? [];
