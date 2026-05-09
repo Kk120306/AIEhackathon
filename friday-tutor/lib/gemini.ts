@@ -5,13 +5,18 @@ let _client: GoogleGenAI | null = null;
 export function getGeminiClient(): GoogleGenAI {
   if (_client) return _client;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const project = process.env.GOOGLE_CLOUD_PROJECT;
+  if (!project) {
     throw new Error(
-      "Missing GEMINI_API_KEY. Copy .env.example to .env.local and add your Gemini API key."
+      "Missing GOOGLE_CLOUD_PROJECT. Set it in .env.local."
     );
   }
 
-  _client = new GoogleGenAI({ apiKey });
+  _client = new GoogleGenAI({
+    vertexai: true,
+    project,
+    location: process.env.GOOGLE_CLOUD_LOCATION ?? "global",
+  });
+
   return _client;
 }

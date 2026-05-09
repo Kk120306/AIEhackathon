@@ -6,6 +6,9 @@ import AnswerPanel from "./Components/AnswerPanel";
 import VisualizationPanel from "./Components/VisualizationPanel";
 import CameraPanel, { type CameraPanelHandle } from "./Components/CameraPanel";
 import { useVoiceRecorder } from "./hooks/useVoiceRecorder";
+import { useVoicePreference } from "./hooks/useVoicePreference";
+import { useAnalytics } from "./hooks/useAnalytics";
+import Link from "next/link";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -24,6 +27,7 @@ export type TutorResponse = {
   tool_call?: TutorToolCall;
   topic?: string;
   is_correct?: boolean;
+  follow_up_questions?: string[];
 };
 
 export type AppStatus =
@@ -57,24 +61,35 @@ function detectCameraTrigger(text: string): boolean {
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState<TutorResponse | null>(null);
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [status, setStatus] = useState<AppStatus>("idle");
   const [error, setError] = useState("");
   const [audioLevel, setAudioLevel] = useState(0);
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [isConversationActive, setIsConversationActive] = useState(false);
 
+  const { voiceId } = useVoicePreference();
+  const { startSession, recordExchange, endSession } = useAnalytics();
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const cameraRef = useRef<CameraPanelHandle>(null);
   // Refs to avoid stale closures in async callbacks
   const isConversationActiveRef = useRef(false);
   const silenceRetriesRef = useRef(0);
   const startListeningRef = useRef<() => void>(() => {});
+  const voiceIdRef = useRef(voiceId);
+
+  useEffect(() => { voiceIdRef.current = voiceId; }, [voiceId]);
 
   useEffect(() => {
     isConversationActiveRef.current = isConversationActive;
   }, [isConversationActive]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis?.cancel(); };
+    return () => {
+      currentAudioRef.current?.pause();
+      currentAudioRef.current = null;
+    };
   }, []);
 
   // After Friday finishes speaking, re-open the mic if still active
@@ -88,14 +103,17 @@ export default function Home() {
     }, LISTEN_RESUME_DELAY_MS);
   }, []);
 
-  const speak = useCallback(
+  const speakFallback = useCallback(
     (text: string) => {
-      if (!("speechSynthesis" in window)) { resumeListening(); return; }
+      if (!("speechSynthesis" in window)) {
+        setStatus("idle");
+        if (isConversationActiveRef.current) resumeListening();
+        return;
+      }
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.95;
       utterance.pitch = 1.05;
-      utterance.volume = 1;
       utterance.onend = () => {
         if (isConversationActiveRef.current) resumeListening();
         else setStatus("idle");
@@ -106,11 +124,55 @@ export default function Home() {
     [resumeListening]
   );
 
+  const speak = useCallback(
+    async (text: string) => {
+      currentAudioRef.current?.pause();
+      currentAudioRef.current = null;
+
+      try {
+        const res = await fetch("/api/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voiceId: voiceIdRef.current }),
+        });
+
+        if (!res.ok) {
+          // ElevenLabs rejected (free plan, bad key, etc.) — fall back to browser TTS
+          speakFallback(text);
+          return;
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudioRef.current = audio;
+
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          currentAudioRef.current = null;
+          if (isConversationActiveRef.current) resumeListening();
+          else setStatus("idle");
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          currentAudioRef.current = null;
+          speakFallback(text);
+        };
+
+        await audio.play();
+      } catch {
+        speakFallback(text);
+      }
+    },
+    [resumeListening, speakFallback]
+  );
+
   const askBackend = useCallback(
     async (q: string, imageBase64?: string) => {
       const message = q.trim();
       if (!message) return;
-      window.speechSynthesis?.cancel();
+      currentAudioRef.current?.pause();
+      currentAudioRef.current = null;
       setStatus("thinking");
       setResponse(null);
       setError("");
@@ -130,11 +192,22 @@ export default function Home() {
 
         const nextResponse = payload as TutorResponse;
         setResponse(nextResponse);
+        if (nextResponse.follow_up_questions?.length) {
+          setFollowUpQuestions(nextResponse.follow_up_questions);
+        }
         setConversationHistory((h) => [
           ...h,
           { role: "user", content: message },
           { role: "assistant", content: nextResponse.spoken_answer },
         ]);
+
+        recordExchange({
+          question: message,
+          answer: nextResponse.spoken_answer,
+          topic: nextResponse.topic,
+          is_correct: nextResponse.is_correct,
+          toolUsed: nextResponse.tool_call?.name,
+        });
 
         if (nextResponse.spoken_answer) {
           setStatus("speaking");
@@ -151,7 +224,7 @@ export default function Home() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [conversationHistory, speak, resumeListening]
+    [conversationHistory, speak, resumeListening, recordExchange]
   );
 
   const handleQuestion = useCallback(
@@ -209,17 +282,21 @@ export default function Home() {
     setIsConversationActive(true);
     isConversationActiveRef.current = true;
     silenceRetriesRef.current = 0;
+    startSession();
     startListening();
-  }, [startListening]);
+  }, [startListening, startSession]);
 
   const stopConversation = useCallback(() => {
     setIsConversationActive(false);
     isConversationActiveRef.current = false;
     stopListening();
+    currentAudioRef.current?.pause();
+    currentAudioRef.current = null;
     window.speechSynthesis?.cancel();
     setStatus("idle");
     setAudioLevel(0);
-  }, [stopListening]);
+    endSession();
+  }, [stopListening, endSession]);
 
   const handleToggleConversation = useCallback(() => {
     if (!isConversationActive) {
@@ -255,15 +332,23 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white p-6">
-      <section className="mb-8">
-        <p className="text-sm uppercase tracking-[0.3em] text-green-400">Friday Tutor</p>
-        <h1 className="mt-2 text-4xl font-bold">
-          Voice-first AI Tutor for IB &amp; Singapore A-Levels
-        </h1>
-        <p className="mt-3 max-w-3xl text-gray-400">
-          Start a conversation and talk to Friday hands-free. Ask about Maths, Physics, or
-          Chemistry — Friday answers verbally and opens visual tools when needed.
-        </p>
+      <section className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm uppercase tracking-[0.3em] text-green-400">Friday Tutor</p>
+          <h1 className="mt-2 text-4xl font-bold">
+            Voice-first AI Tutor for IB &amp; Singapore A-Levels
+          </h1>
+          <p className="mt-3 max-w-3xl text-gray-400">
+            Start a conversation and talk to Friday hands-free. Ask about Maths, Physics, or
+            Chemistry — Friday answers verbally and opens visual tools when needed.
+          </p>
+        </div>
+        <Link
+          href="/dashboard"
+          className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 hover:border-purple-500 hover:text-white transition-colors whitespace-nowrap"
+        >
+          Parent Dashboard →
+        </Link>
       </section>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -313,25 +398,44 @@ export default function Home() {
             </div>
           </details>
 
-          {/* Demo prompts */}
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-semibold text-gray-300">Try a demo question</p>
-            <div className="grid gap-3">
-              {demoQuestions.map((demo, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setQuestion(demo);
-                    // Demo prompts use text path — voice loop stays off
-                    askBackend(demo);
-                  }}
-                  className="rounded-xl border border-gray-700 bg-gray-900 p-3 text-left text-sm text-gray-300 hover:border-green-400 hover:text-white"
-                >
-                  {demo}
-                </button>
-              ))}
+          {/* Demo prompts / Follow-up questions */}
+          {conversationHistory.length === 0 ? (
+            <div className="mt-6">
+              <p className="mb-3 text-sm font-semibold text-gray-300">Try a demo question</p>
+              <div className="grid gap-3">
+                {demoQuestions.map((demo, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setQuestion(demo);
+                      askBackend(demo);
+                    }}
+                    className="rounded-xl border border-gray-700 bg-gray-900 p-3 text-left text-sm text-gray-300 hover:border-green-400 hover:text-white"
+                  >
+                    {demo}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : followUpQuestions.length > 0 ? (
+            <div className="mt-6">
+              <p className="mb-3 text-sm font-semibold text-gray-300">Follow-up questions</p>
+              <div className="grid gap-3">
+                {followUpQuestions.map((q, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setQuestion(q);
+                      askBackend(q);
+                    }}
+                    className="rounded-xl border border-gray-700 bg-gray-900 p-3 text-left text-sm text-gray-300 hover:border-green-400 hover:text-white"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <AnswerPanel question={question} response={response} />
         </div>

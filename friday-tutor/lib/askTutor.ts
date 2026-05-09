@@ -17,7 +17,47 @@ export type AskTutorResult = {
   tool_call?: TutorToolCall;
   topic?: string;
   is_correct?: boolean;
+  follow_up_questions?: string[];
 };
+
+async function generateFollowUpQuestions(
+  ai: ReturnType<typeof getGeminiClient>,
+  userQuestion: string,
+  assistantAnswer: string
+): Promise<string[]> {
+  try {
+    const prompt = `A student asked a tutor: "${userQuestion}"
+The tutor answered: "${assistantAnswer}"
+
+Generate exactly 3 short follow-up questions the student might want to ask next about this topic. Each question must be under 15 words and directly related to the exchange above.
+
+Respond with a JSON object in this exact format:
+{"questions": ["question 1", "question 2", "question 3"]}`;
+
+    const result = await ai.models.generateContent({
+      model: process.env.GEMINI_CHAT_MODEL ?? "gemini-1.5-flash-8b",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.7,
+      },
+    });
+
+    const raw = result.text ?? "";
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    const parsed = JSON.parse(cleaned);
+    if (
+      parsed &&
+      Array.isArray(parsed.questions) &&
+      parsed.questions.every((q: unknown) => typeof q === "string")
+    ) {
+      return parsed.questions.slice(0, 3);
+    }
+  } catch {
+    // silently fall back to empty
+  }
+  return [];
+}
 
 export async function askTutor({
   message,
@@ -41,7 +81,7 @@ export async function askTutor({
     }));
 
   const chat = ai.chats.create({
-    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-2.5-flash-lite",
+    model: process.env.GEMINI_CHAT_MODEL ?? "gemini-1.5-flash-8b",
     history,
     config: {
       systemInstruction: SYSTEM_PROMPT,
@@ -64,8 +104,13 @@ export async function askTutor({
   let topic: string | undefined;
   let isCorrect: boolean | undefined;
 
+  // Try to extract structured fields if model happened to return JSON
+  const jsonCandidate = rawText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
   try {
-    const parsed = JSON.parse(rawText);
+    const parsed = JSON.parse(jsonCandidate);
     if (parsed && typeof parsed.spoken_answer === "string") {
       spokenAnswer = parsed.spoken_answer;
       if (typeof parsed.topic === "string") topic = parsed.topic;
@@ -78,8 +123,6 @@ export async function askTutor({
   if (functionCallPart?.functionCall) {
     const fc = functionCallPart.functionCall;
 
-    // If Gemini returned a tool call but no spoken explanation, build one from
-    // the tool arguments so the student always hears something meaningful.
     if (!spokenAnswer) {
       const toolName = fc.name ?? "";
       const args = (fc.args ?? {}) as Record<string, unknown>;
@@ -99,6 +142,8 @@ export async function askTutor({
       }
     }
 
+    const followUpQuestions = await generateFollowUpQuestions(ai, message, spokenAnswer);
+
     return {
       spoken_answer: spokenAnswer,
       tool_call: {
@@ -107,8 +152,11 @@ export async function askTutor({
       },
       topic,
       is_correct: isCorrect,
+      follow_up_questions: followUpQuestions,
     };
   }
 
-  return { spoken_answer: spokenAnswer, topic, is_correct: isCorrect };
+  const followUpQuestions = await generateFollowUpQuestions(ai, message, spokenAnswer);
+
+  return { spoken_answer: spokenAnswer, topic, is_correct: isCorrect, follow_up_questions: followUpQuestions };
 }

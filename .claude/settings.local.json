@@ -1,15 +1,18 @@
 {
-  "enabledMcpjsonServers": ["convex"],
   "permissions": {
     "allow": [
       "Bash(mkdir -p docs)",
       "Bash(npx create-next-app@14 friday-tutor --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --eslint --no-git)",
       "Bash(git add *)",
       "Bash(git push *)",
-      "Read(//Users/kaikameyama/.claude/**)"
+      "Read(//Users/kaikameyama/.claude/**)",
+      "Bash(git checkout *)"
     ],
     "additionalDirectories": [
       "/Users/kaikameyama/repos/AIEhackathon"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "convex"
+  ]
 }
