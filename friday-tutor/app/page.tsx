@@ -1,17 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import MicButton from "./components/MicButton";
 import AnswerPanel from "./components/AnswerPanel";
 import VisualizationPanel from "./components/VisualizationPanel";
 
+export type ConversationMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+export type TutorToolCall = {
+  name: string;
+  args: Record<string, unknown>;
+};
+
+export type TutorResponse = {
+  spoken_answer: string;
+  tool_call?: TutorToolCall;
+  topic?: string;
+  is_correct?: boolean;
+};
+
+export type AppStatus =
+  | "idle"
+  | "listening"
+  | "transcribing"
+  | "thinking"
+  | "speaking"
+  | "error";
+
 export default function Home() {
   const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState<any>(null);
-  const [status, setStatus] = useState("idle");
+  const [response, setResponse] = useState<TutorResponse | null>(null);
+  const [status, setStatus] = useState<AppStatus>("idle");
+  const [error, setError] = useState("");
+  const [conversationHistory, setConversationHistory] = useState<
+    ConversationMessage[]
+  >([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  const startSessionMutation   = useMutation(api.sessions.startSession);
+  const endSessionMutation     = useMutation(api.sessions.endSession);
+  const saveMessageMutation    = useMutation(api.sessions.saveMessage);
+  const addTopicMutation       = useMutation(api.sessions.addTopicToSession);
+  const upsertProgressMutation = useMutation(api.sessions.upsertProgress);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      if (sessionId) endSessionMutation({ sessionId });
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, [sessionId, endSessionMutation]);
+
+  useEffect(() => {
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const stopAudio = () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    setStatus((currentStatus) =>
+      currentStatus === "speaking" ? "idle" : currentStatus
+    );
+  };
 
   const speak = (text: string) => {
     if (!text) return;
+    if (!("speechSynthesis" in window)) {
+      setStatus("idle");
+      return;
+    }
 
     window.speechSynthesis.cancel();
 
@@ -24,40 +92,99 @@ export default function Home() {
       setStatus("idle");
     };
 
+    utterance.onerror = () => {
+      setStatus("idle");
+    };
+
     window.speechSynthesis.speak(utterance);
   };
 
   const askBackend = async (q: string) => {
-    if (!q.trim()) return;
+    const message = q.trim();
+    if (!message) return;
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
 
     setStatus("thinking");
     setResponse(null);
+    setError("");
 
-    // TEMPORARY MOCK RESPONSE
-    // Use this until Kai's backend is ready.
-    const mockResponse = {
-      subject: "Mathematics",
-      topic: "Graph Transformation",
-      spoken_answer:
-        "Of course. Start with y equals x squared. The expression x minus 3 shifts the graph 3 units to the right. The coefficient 2 stretches the graph vertically, making it narrower. Finally, the plus 1 shifts the graph 1 unit upward.",
-      needs_visualization: true,
-      visualization_tool: "desmos",
-      visualization_url: "https://www.desmos.com/calculator",
-      display_steps: [
-        "Start with the base graph: y = x².",
-        "Replace x with (x - 3), which shifts the graph 3 units to the right.",
-        "Multiply the function by 2, which stretches the graph vertically.",
-        "Add 1 outside the bracket, which shifts the graph 1 unit upward.",
-      ],
-      exam_tip:
-        "For graph transformations, identify horizontal shifts inside the bracket first, then vertical stretches and vertical translations.",
-    };
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          conversationHistory,
+        }),
+      });
 
-    setTimeout(() => {
-      setResponse(mockResponse);
-      setStatus("speaking");
-      speak(mockResponse.spoken_answer);
-    }, 1000);
+      const payload = await res.json();
+
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Friday could not answer that yet.");
+      }
+
+      const nextResponse = payload as TutorResponse;
+
+      // Session lifecycle
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        currentSessionId = await startSessionMutation({ studentName: "Student" });
+        setSessionId(currentSessionId);
+      }
+
+      // Persist both turns
+      await saveMessageMutation({
+        sessionId: currentSessionId,
+        role: "user",
+        content: message,
+      });
+      await saveMessageMutation({
+        sessionId: currentSessionId,
+        role: "assistant",
+        content: nextResponse.spoken_answer,
+        topicTag: nextResponse.topic,
+      });
+
+      // Track topic
+      if (nextResponse.topic) {
+        await addTopicMutation({
+          sessionId: currentSessionId,
+          topic: nextResponse.topic,
+        });
+      }
+
+      // Track progress (only when is_correct is defined)
+      if (nextResponse.topic && nextResponse.is_correct !== undefined) {
+        await upsertProgressMutation({
+          sessionId: currentSessionId,
+          topic: nextResponse.topic,
+          isCorrect: nextResponse.is_correct,
+        });
+      }
+
+      setResponse(nextResponse);
+      setConversationHistory((history) => [
+        ...history,
+        { role: "user", content: message },
+        { role: "assistant", content: nextResponse.spoken_answer },
+      ]);
+
+      if (nextResponse.spoken_answer) {
+        setStatus("speaking");
+        speak(nextResponse.spoken_answer);
+      } else {
+        setStatus("idle");
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      setStatus("error");
+    }
   };
 
   const handleTypedSubmit = () => {
@@ -72,6 +199,11 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white p-6">
+      <div className="mb-4 flex justify-end">
+        <a href="/dashboard" className="text-xs text-gray-500 hover:text-gray-300 underline">
+          Parent Dashboard →
+        </a>
+      </div>
       <section className="mb-8">
         <p className="text-sm uppercase tracking-[0.3em] text-green-400">
           Friday Tutor
@@ -95,13 +227,24 @@ export default function Home() {
               setQuestion={setQuestion}
               askBackend={askBackend}
               setStatus={setStatus}
+              setError={setError}
             />
+
+            <button
+              type="button"
+              onClick={stopAudio}
+              disabled={status !== "speaking"}
+              className="rounded-xl border border-red-900 bg-red-950 px-5 py-3 font-bold text-red-100 hover:border-red-500 hover:bg-red-900 disabled:cursor-not-allowed disabled:border-gray-800 disabled:bg-gray-900 disabled:text-gray-600"
+            >
+              Stop audio
+            </button>
 
             <div>
               <p className="text-sm text-gray-400">System status</p>
               <p className="font-semibold text-green-400">
                 {status === "idle" && "Ready"}
                 {status === "listening" && "Listening..."}
+                {status === "transcribing" && "Transcribing..."}
                 {status === "thinking" && "Thinking..."}
                 {status === "speaking" && "Friday is speaking..."}
                 {status === "error" && "Error"}
@@ -123,11 +266,18 @@ export default function Home() {
 
             <button
               onClick={handleTypedSubmit}
-              className="mt-3 rounded-xl bg-green-500 px-5 py-3 font-bold text-black hover:bg-green-400"
+              disabled={status === "thinking" || status === "transcribing"}
+              className="mt-3 rounded-xl bg-green-500 px-5 py-3 font-bold text-black hover:bg-green-400 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
             >
               Ask Friday
             </button>
           </div>
+
+          {error && (
+            <div className="mt-4 rounded-xl border border-red-800 bg-red-950/60 p-3 text-sm text-red-200">
+              {error}
+            </div>
+          )}
 
           <div className="mt-6">
             <p className="mb-3 text-sm font-semibold text-gray-300">

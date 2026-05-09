@@ -15,6 +15,8 @@ export type TutorToolCall = {
 export type AskTutorResult = {
   spoken_answer: string;
   tool_call?: TutorToolCall;
+  topic?: string;
+  is_correct?: boolean;
 };
 
 export async function askTutor({
@@ -48,18 +50,39 @@ export async function askTutor({
   const functionCallPart = parts.find((p) => p.functionCall);
   const textPart = parts.find((p) => p.text);
 
+  // Try to parse the text part as JSON to extract topic / is_correct
+  const rawText = textPart?.text ?? response.text();
+  let spokenAnswer = rawText;
+  let topic: string | undefined;
+  let isCorrect: boolean | undefined;
+
+  try {
+    const parsed = JSON.parse(rawText);
+    if (parsed && typeof parsed.spoken_answer === "string") {
+      spokenAnswer = parsed.spoken_answer;
+      if (typeof parsed.topic === "string") topic = parsed.topic;
+      if (typeof parsed.is_correct === "boolean") isCorrect = parsed.is_correct;
+    }
+  } catch {
+    // Not JSON — use raw text as spoken_answer, no topic/is_correct
+  }
+
   if (functionCallPart?.functionCall) {
     const fc = functionCallPart.functionCall;
     return {
-      spoken_answer: textPart?.text ?? "",
+      spoken_answer: spokenAnswer,
       tool_call: {
         name: fc.name,
         args: (fc.args ?? {}) as Record<string, unknown>,
       },
+      topic,
+      is_correct: isCorrect,
     };
   }
 
   return {
-    spoken_answer: response.text(),
+    spoken_answer: spokenAnswer,
+    topic,
+    is_correct: isCorrect,
   };
 }
